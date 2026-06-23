@@ -1,0 +1,7 @@
+node_modules/
+.env
+*.log
+# Phase 2 SQLite artifacts (kept out of git)
+*.sqlite
+*.sqlite-*
+data/

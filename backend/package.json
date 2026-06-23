@@ -1,0 +1,15 @@
+{
+  "name": "hyperliquid-dashboard-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Poller + SSE fan-out for the Hyperliquid crowd-positioning dashboard",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test"
+  }
+}
