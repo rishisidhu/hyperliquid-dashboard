@@ -1,49 +1,92 @@
+/* Design tokens — copied verbatim from design/design-tokens.md. Color is
+   signal, never theme; intensity is carried by filled segments; long = teal,
+   short = amber, never red/green. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  /* base & surfaces */
+  --bg: #08090b;
+  --surface-1: #0d0f13;
+  --surface-2: #13161c;
+  --surface-3: #1a1e25;
+  --border: #1e222a;
+  --border-strong: #2b313b;
+  /* text tiers */
+  --text-1: #e9ecf1;
+  --text-2: #a6aebb;
+  --text-3: #6b7480;
+  --text-4: #454c56;
+  /* meaning */
+  --long: oklch(0.74 0.12 195);
+  --long-dim: oklch(0.5 0.045 195);
+  --short: oklch(0.78 0.135 70);
+  --short-dim: oklch(0.56 0.055 70);
+  --balanced: #5a626d;
+  --rising: oklch(0.78 0.1 155);
+  --unwinding: oklch(0.66 0.085 285);
+  --flat: #6b7480;
+  --stale: oklch(0.74 0.1 60);
+  --pip-off: #262b34;
+  /* layout: board column template */
+  --board-cols: minmax(150px, 1.3fr) minmax(184px, 1.5fr) 116px 104px 92px 104px 150px;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-html {
-  height: 100%;
-}
-
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-body {
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* font stacks bound to next/font variables (set in layout.tsx) */
+  --font-ui: var(--font-geist), system-ui, sans-serif;
+  --font-num: var(--font-mono), "JetBrains Mono", ui-monospace, monospace;
 }
 
 * {
   box-sizing: border-box;
-  padding: 0;
+}
+
+html,
+body {
   margin: 0;
+  padding: 0;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+body {
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
+::selection {
+  background: var(--long-dim);
+  color: #fff;
+}
+
+/* live dot (top bar) */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.28;
+  }
+}
+
+/* warming dot (OI trend before history exists) */
+@keyframes warm {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
