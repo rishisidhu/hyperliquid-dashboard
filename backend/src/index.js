@@ -4,12 +4,15 @@
 import { config } from './config.js';
 import { Poller } from './poller.js';
 import { SseHub } from './sse.js';
+import { Snapshotter } from './snapshotter.js';
 import { createApp } from './server.js';
 
-const poller = new Poller();
+const snapshotter = new Snapshotter();
+const poller = new Poller({ trendSource: snapshotter });
 const sseHub = new SseHub();
 const server = createApp(sseHub);
 
+snapshotter.start();
 sseHub.start();
 poller.start();
 
@@ -27,6 +30,7 @@ function shutdown(signal) {
   console.log(`[server] ${signal} — shutting down`);
   poller.stop();
   sseHub.stop();
+  snapshotter.stop();
   server.close(() => process.exit(0));
   // Don't hang forever if a socket refuses to close.
   setTimeout(() => process.exit(0), 5000).unref();

@@ -6,15 +6,22 @@
 import { config } from './config.js';
 import { fetchMetaAndAssetCtxs } from './hlClient.js';
 import { deriveBoard } from './derive.js';
+import { computeOiTrend } from './trend.js';
 import { cache } from './cache.js';
 
 const MAX_BACKOFF_MS = 60000;
 
 export class Poller {
-  constructor() {
+  /**
+   * @param {{getReference?: (coin:string)=>{oiNotional:number,ts:number}|undefined}} [opts]
+   *   Optional trend reference source (the snapshotter). If absent, rows keep
+   *   oiTrend:null (Phase-1 behaviour).
+   */
+  constructor({ trendSource } = {}) {
     this.timer = null;
     this.running = false;
     this.backoffMs = 0; // 0 = healthy; grows on consecutive failures
+    this.trendSource = trendSource || null;
   }
 
   start() {
@@ -35,7 +42,9 @@ export class Poller {
     if (!this.running) return;
     try {
       const raw = await fetchMetaAndAssetCtxs();
-      cache.set(deriveBoard(raw));
+      const board = deriveBoard(raw);
+      this.#enrichTrend(board);
+      cache.set(board);
       this.backoffMs = 0; // recovered
     } catch (err) {
       cache.markError(err.message);
@@ -48,6 +57,17 @@ export class Poller {
       console.error(`[poller] ${err.message} — retrying in ${this.backoffMs}ms`);
     } finally {
       this.#schedule();
+    }
+  }
+
+  // Cheap hot-path enrichment: look up each coin's ~window-ago reference from
+  // the snapshotter's in-memory map (no SQLite here) and derive the OI trend.
+  #enrichTrend(board) {
+    if (!this.trendSource) return;
+    const now = Date.now();
+    for (const row of board.rows) {
+      const ref = this.trendSource.getReference(row.coin);
+      row.oiTrend = computeOiTrend(row.oiNotional, ref, now, config.oiTrendDeadbandPct);
     }
   }
 
