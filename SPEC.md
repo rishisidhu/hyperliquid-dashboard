@@ -264,11 +264,16 @@ Base URL: `https://api.hyperliquid.xyz`
 > For each task, update status and add a dated note for hurdles, decisions, deviations.
 
 ### Phase 1 — Backend core
-- ⬜ Poll Hyperliquid `metaAndAssetCtxs` (~2s)
-- ⬜ In-memory market-state cache
-- ⬜ Derive annualized funding + crowd-skew badge
-- ⬜ SSE endpoint (bound 127.0.0.1)
+- ✅ Poll Hyperliquid `metaAndAssetCtxs` (~2s)
+- ✅ In-memory market-state cache
+- ✅ Derive annualized funding + crowd-skew badge
+- ✅ SSE endpoint (bound 127.0.0.1)
 - *Notes:*
+  - *2026-06-23 — Phase 1 complete. `backend/` is a zero-runtime-dependency Node 20 service: `hlClient` (single read-only POST to `metaAndAssetCtxs`, fixed body, 10s timeout — the only upstream touchpoint), `derive` (pure transform → board model), `cache` (in-memory source of truth, emits `update`), `poller` (single self-scheduling timer, exponential backoff capped at 60s), `sse` (full-snapshot fan-out, client cap → 503, 15s heartbeat), `server` (localhost-only, GET-only, `/stream` + `/health`, CORS locked to `https://niminal.xyz`, generic errors). Verified live: 178 active perps (delisted filtered from 230 in `universe`), derived funding/skew/OI-notional correct in the SSE payload; `/health` reports stale→ready; 405/404 routing correct; graceful SIGINT/SIGTERM shutdown. 7 unit tests for derivation pass via `node --test`.*
+  - *Field shape confirmed against live API: top-level `[meta, ctxs]`, `meta.universe[i]` parallel-indexed with `ctxs[i]`; all numeric ctx fields are strings (parsed with a finite-number guard). Delisted markets carry `isDelisted` on the universe entry and are skipped.*
+  - *Seeded a few §8.5/Phase-7 guards early because they were cheap and structural (poll backoff, SSE client cap + 503, heartbeat, localhost bind, GET-only, CORS lock, no stack traces, bounded HTTP timeouts). Full hardening + OS-level isolation still belongs to Phase 8.*
+  - *Crowd-skew thresholds in `derive.js` (balanced <5%, extreme ≥50% annualized) are **provisional placeholders**, clearly marked — open question below stays open pending live-distribution inspection.*
+  - *OI trend arrow returns `null` for now (needs stored snapshots — Phase 2).*
 
 ### Phase 2 — Persistence
 - ⬜ SQLite (`better-sqlite3`), own dir, unprivileged user
@@ -340,3 +345,7 @@ Base URL: `https://api.hyperliquid.xyz`
 ### Decision / pivot log (append-only)
 - *2026-06-19 — v0.2: added SQLite persistence, education layer, progress log.*
 - *2026-06-19 — v0.3: inventory revealed droplet hosts aigraduate.com (Ghost), not niminal; niminal is a Vercel/Next.js app (DNS at BigRock). Pivoted to split architecture — frontend on Vercel (niminal.xyz), persistent backend on droplet (api.niminal.xyz). Added §8.5 security/attack-surface hardening focused on not harming the co-hosted blog and never becoming an open proxy to Hyperliquid.*
+- *2026-06-23 — Phase 1 decisions:*
+  - ***Zero runtime dependencies for the backend.*** *Node 20 built-ins only — global `fetch` (no axios/node-fetch), `node:http` + raw SSE (no Express). Rejected: web frameworks/HTTP clients. Why: smallest possible footprint on the $6 box co-hosting the blog, fewer supply-chain/CVE surfaces, nothing to audit. `better-sqlite3` (Phase 2) and a WS client (later WS swap) will be the first deps, added only when needed.*
+  - ***~2s upstream poll cadence, env-configurable with a 1s hard floor.*** *A single poller serves all clients (fan-out), so upstream footprint is constant regardless of browser count. The floor makes an abusive low value impossible. The exact Hyperliquid rate-limit budget is treated as approximate; 2s is far under any plausible limit and the margin is the point — no logic is hard-coded around a specific budget number.*
+  - ***Full-snapshot SSE payload (deltas deferred).*** *Each tick pushes the complete derived board + headlines. At ~tens of KB for ~200 perps every 2s, deltas buy almost nothing while adding state-tracking/resync complexity; full snapshots are also naturally robust to reconnects. Deltas remain a documented future lever only if concurrent-client bandwidth ever becomes the bottleneck.*
