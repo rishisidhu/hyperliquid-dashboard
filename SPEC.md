@@ -276,10 +276,14 @@ Base URL: `https://api.hyperliquid.xyz`
   - *OI trend arrow returns `null` for now (needs stored snapshots — Phase 2).*
 
 ### Phase 2 — Persistence
-- ⬜ SQLite (`better-sqlite3`), own dir, unprivileged user
-- ⬜ Rolling OI snapshots (30–60s) + prune >1h
-- ⬜ OI-trend derivation
+- ✅ SQLite (`better-sqlite3`), own dir, unprivileged user
+- ✅ Rolling OI snapshots (30–60s) + prune >1h
+- ✅ OI-trend derivation
 - *Notes:*
+  - *2026-06-24 — Phase 2 complete. `oiStore.js` (better-sqlite3 v11, WAL + synchronous=NORMAL, own-dir file via `OI_DB_PATH`, atomic record-then-prune, per-coin reference query using SQLite's bare-column-with-MAX idiom — commented so it isn't "fixed" later), `trend.js` (pure rising/unwinding/flat + 'warming' state, deadband), `snapshotter.js` (records one OI sample/coin every ~60s, prunes >1h, maintains an in-memory reference map refreshed each snapshot). Poller enriches `row.oiTrend` from that map every poll — **no SQLite on the 2s hot path**. Reference is primed from persisted history on startup, so trends survive restarts.*
+  - *Configurable constants (env, defaults): `OI_SNAPSHOT_INTERVAL_MS`=60000, `OI_RETENTION_MS`=3600000 (~1h), `OI_TREND_WINDOW_MS`=1200000 (~20min, the now-vs-15–30-min-ago window), `OI_TREND_DEADBAND_PCT`=1.0, `OI_DB_PATH`=./data/oi.sqlite.*
+  - *Verified live (with compressed interval/window): all coins `warming` at start → `{state:'ok', direction:'rising'|'unwinding'|'flat', pctChange, refAgeMs}` once a >window-old sample exists; SQLite file created in its own dir; prune transaction bounds the file. Full suite 18 tests pass (`node --test`): 7 derive, 6 trend, 5 oiStore (incl. bare-column idiom + prune).*
+  - *Dependency: pinned `better-sqlite3@^11.10.0` (prebuilt, no toolchain) — see the v11-vs-v12 entry in the decision log below. Deferred: arrows/"warming" UI is Phase 4; file ownership/permission hardening is Phase 8.*
 
 ### Phase 3 — Frontend board
 - ⬜ Sortable per-perp table
