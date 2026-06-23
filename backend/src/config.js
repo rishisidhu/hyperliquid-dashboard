@@ -34,6 +34,11 @@ function intEnv(name, fallback) {
   return Number.isFinite(v) ? v : fallback;
 }
 
+function floatEnv(name, fallback) {
+  const v = parseFloat(process.env[name]);
+  return Number.isFinite(v) ? v : fallback;
+}
+
 // Never let the poll interval drop below this floor, regardless of env, so a
 // misconfiguration can't hammer Hyperliquid and get our IP rate-limited
 // (SPEC §8.5: nothing may risk a ban). The exact upstream budget is treated
@@ -51,4 +56,17 @@ export const config = {
   hlInfoUrl: 'https://api.hyperliquid.xyz/info',
   // Bound the upstream request so a hung connection can't pile up.
   hlRequestTimeoutMs: 10000,
+
+  // --- Phase 2: OI-snapshot persistence (SPEC §5.1) -----------------------
+  // SQLite file lives in its own directory owned by the service user (§8.5).
+  // Default is project-local ./data so it's never near blog data dirs.
+  oiDbPath: process.env.OI_DB_PATH || join(__dirname, '..', 'data', 'oi.sqlite'),
+  // How often we append one OI sample per coin (SPEC §5.1: 30–60s).
+  oiSnapshotIntervalMs: intEnv('OI_SNAPSHOT_INTERVAL_MS', 60000),
+  // Prune snapshots older than this (~1h, SPEC §5.1) to bound the file.
+  oiRetentionMs: intEnv('OI_RETENTION_MS', 3600000),
+  // Trend window: compare OI now vs ~this long ago (SPEC §4.2: 15–30 min).
+  oiTrendWindowMs: intEnv('OI_TREND_WINDOW_MS', 1200000),
+  // Below this |%| change the trend reads "flat" (noise deadband).
+  oiTrendDeadbandPct: floatEnv('OI_TREND_DEADBAND_PCT', 1.0),
 };
