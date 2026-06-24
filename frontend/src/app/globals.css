@@ -58,6 +58,10 @@ body {
   color: #fff;
 }
 
+.board-row:hover {
+  background: var(--surface-2);
+}
+
 /* live dot (top bar) */
 @keyframes pulse {
   0%,

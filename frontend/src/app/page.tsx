@@ -1,66 +1,96 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
 
-export default function Home() {
+import { useMemo, useState } from "react";
+import { useStream, useNow } from "@/lib/useStream";
+import { headline, hlItem, interp } from "@/lib/viewModel";
+import { TopBar } from "@/components/TopBar";
+import { HeadlineStrip } from "@/components/HeadlineStrip";
+import { Board } from "@/components/Board";
+
+// Relative age, e.g. "2s ago" / "3m ago". Null when we have no timestamp.
+function ago(ms: number, fromMs: number | null): string | null {
+  if (fromMs == null) return null;
+  const s = Math.max(0, Math.round((ms - fromMs) / 1000));
+  if (s < 60) return `${s}s ago`;
+  return `${Math.floor(s / 60)}m ago`;
+}
+
+function staleAgeStr(ms: number, fromMs: number | null): string {
+  if (fromMs == null) return "";
+  const s = Math.max(0, Math.round((ms - fromMs) / 1000));
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m`;
+}
+
+export default function Page() {
+  const { snapshot, connected } = useStream();
+  const now = useNow(1000);
+  const [query, setQuery] = useState("");
+
+  const board = snapshot?.board ?? null;
+  const stale = snapshot?.stale ?? false;
+  const rows = board?.rows ?? [];
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toUpperCase();
+    if (!q) return rows;
+    return rows.filter((r) => r.coin.toUpperCase().includes(q));
+  }, [rows, query]);
+
+  // Headlines: by intensity desc per the locked design (computed from rows).
+  const longs = useMemo(() => headline(rows, "long"), [rows]);
+  const shorts = useMemo(() => headline(rows, "short"), [rows]);
+
+  const longTop = longs[0]
+    ? { ...hlItem(longs[0]), interp: interp(longs[0]) }
+    : null;
+  const shortTop = shorts[0]
+    ? { ...hlItem(shorts[0]), interp: interp(shorts[0]) }
+    : null;
+  const longRest = longs.slice(1, 3).map(hlItem);
+  const shortRest = shorts.slice(1, 3).map(hlItem);
+
+  const updatedAgo = ago(now, snapshot?.updatedAt ?? null);
+  const staleAge = staleAgeStr(now, snapshot?.updatedAt ?? null);
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+    <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
+      <TopBar
+        connected={connected}
+        updatedAgo={updatedAgo}
+        marketCount={board?.coinCount ?? 0}
+        query={query}
+        onQuery={setQuery}
+      />
+
+      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "26px 22px 90px" }}>
+        {board ? (
+          <>
+            <HeadlineStrip
+              longTop={longTop}
+              longRest={longRest}
+              shortTop={shortTop}
+              shortRest={shortRest}
             />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <Board
+              rows={filtered}
+              stale={stale}
+              staleAge={staleAge}
+              marketCount={board.coinCount}
+            />
+          </>
+        ) : (
+          <div
+            style={{
+              padding: "80px 0",
+              textAlign: "center",
+              color: "var(--text-3)",
+              fontSize: 13,
+            }}
           >
-            Documentation
-          </a>
-        </div>
-      </main>
+            {connected ? "Loading the board…" : "Connecting to the live feed…"}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
