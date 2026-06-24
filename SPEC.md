@@ -299,9 +299,15 @@ Base URL: `https://api.hyperliquid.xyz`
 - *Decision — headline ranking:* *Frontend ranks the strip by `skew.intensity` desc (excl. balanced), matching the locked design, rather than the backend's funding×OI `headlines` field (which goes unused for now). Reconciling the two remains the SPEC §12 open question ("Headline weighting funding vs funding × OI") — deferred. This is why the Phase-3 task above is annotated "see note re: weighting".*
 
 ### Phase 4 — OI trend UI
-- ⬜ Rising/unwinding arrows
-- ⬜ "Warming up" state after restart
+- ✅ Rising/unwinding arrows
+- ✅ "Warming up" state after restart
 - *Notes:*
+  - *2026-06-24 — Verified, not net-new. The arrows + warming state were already built in Phase 3 (the locked design required every state to render), so Phase 4 was a verification pass focused on the one path never seen before: real `rising`/`unwinding`/`flat` arrows from genuine aged OI history (fresh DBs only ever produce `warming`).*
+  - ***How the aged-history path was tested (compressed time):*** *Ran the backend with a short trend window + fast snapshots via env (test-only, not committed): `OI_TREND_WINDOW_MS=60000 OI_SNAPSHOT_INTERVAL_MS=5000 OI_RETENTION_MS=600000 OI_TREND_DEADBAND_PCT=0.05`, fresh `OI_DB_PATH`. So real OI samples accumulate and references (latest sample at/before now−window) populate within ~1 min from genuine data, not fixtures.*
+  - ***Results:*** *At startup all 178 coins `warming` (no history ≥ window old). After the window elapsed, the warming→populated transition occurred and all three directions rendered from real data — a representative frame: `{warming:0, rising:43, unwinding:77, flat:58}`, with `refAgeMs`≈62s (correct for a 60s window at 5s granularity). Direction/sign consistent with the design's `trendVM` (▲ Rising / --rising, ▼ Unwinding / --unwinding, — Flat / --flat, signed pct).*
+  - ***Deadband validated against real values:*** *across all 178 rows, zero violations — no row with |Δ|<0.05% was non-flat, and no row with |Δ|≥0.05% was flat (e.g. ATOM −0.04% → flat; BNB −0.07% → unwinding). Confirms small genuine changes correctly read as "flat".*
+  - ***Production window unchanged:*** *the short window is test-only and was NOT committed; defaults remain `OI_TREND_WINDOW_MS=1200000` (~20min), `OI_SNAPSHOT_INTERVAL_MS=60000`. Verified `git status` clean after the test.*
+  - *Visual confirmation of glyph/color/word/pct deferred to the operator's own browser (headless-Chrome screenshot was unreliable here — no `timeout` binary on macOS, and a running user Chrome locked the default profile). The frontend renders these states via the unit-covered `trendVM`; Phase 3 already screenshotted the same component in its warming state.*
 
 ### Phase 5 — Signature feature
 - ⬜ `predictedFundings` cross-venue panel
