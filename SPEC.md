@@ -286,10 +286,16 @@ Base URL: `https://api.hyperliquid.xyz`
   - *Dependency: pinned `better-sqlite3@^11.10.0` (prebuilt, no toolchain) — see the v11-vs-v12 entry in the decision log below. Deferred: arrows/"warming" UI is Phase 4; file ownership/permission hardening is Phase 8.*
 
 ### Phase 3 — Frontend board
-- ⬜ Sortable per-perp table
-- ⬜ Headline strip (funding × OI weighted)
-- ⬜ Color coding by funding extremity
+- ✅ Sortable per-perp table
+- ✅ Headline strip (see note re: weighting)
+- ✅ Color coding by funding extremity
 - *Notes:*
+  - *2026-06-24 — Phase 3 complete. `frontend/` scaffolded with create-next-app: Next 16.2.9, React 19, App Router, TypeScript, src/ layout, ESLint, import alias `@/*`, **no Tailwind** (plain CSS suits the token-driven design). No runtime deps beyond next/react. Fonts: Geist + JetBrains Mono via `next/font/google` (self-hosted). `output:'export'` set (SPEC §6 static export) — verified `next build` produces static `out/`.*
+  - *Design ported from `design/` (mockup is Claude-Design templating, not React — re-implemented, not imported): tokens copied verbatim into `globals.css`; `skewColor`/`pipCount`/`pips`, the `usd`/`pct`/`price` formatters, and the `rowVM`/`trendVM`/`interp`/`hlItem` view model ported near-verbatim into `src/lib/` (null-safe, since the live feed can carry nulls the fixtures didn't). Components: `TopBar`, `HeadlineStrip`, `Board` (sortable), shared `Pips`. Live data via `useStream` (EventSource → /stream, auto-reconnect, board-level staleness, "updated Ns ago").*
+  - *All five states implemented from real data: balanced (neutral axis tick), mild/extreme (pip ramp + OKLCH hue), warming (pulsing dot + "Warming up", no fake zeros), stale (row dim 50% + STALE chip). Long=teal / short=amber, never red/green; 24h column monochrome with ▲/▽ carets. Tone descriptive-only (interp copy, no buy/sell).*
+  - *Verified end-to-end against the live Phase-1/2 backend (headless-Chrome screenshot): headline strip + sortable board render with real funding/skew/OI; warming state correct on a fresh DB. Build is green (TypeScript + lint + static export).*
+  - *Deferred: education tooltips → light "How to read" control + header titles now, full in **Phase 6**; cross-venue panel + sparklines → **Phase 5** (no row-expand yet); mockup's design-system reference appendix → not built (its states are implemented live in the board). Search box wired as a client-side coin filter.*
+- *Decision — headline ranking:* *Frontend ranks the strip by `skew.intensity` desc (excl. balanced), matching the locked design, rather than the backend's funding×OI `headlines` field (which goes unused for now). Reconciling the two remains the SPEC §12 open question ("Headline weighting funding vs funding × OI") — deferred. This is why the Phase-3 task above is annotated "see note re: weighting".*
 
 ### Phase 4 — OI trend UI
 - ⬜ Rising/unwinding arrows
@@ -358,3 +364,9 @@ Base URL: `https://api.hyperliquid.xyz`
   - ***OI persistence is off the hot path.*** *SQLite is written/read only by the snapshotter (~every 60s); the 2s poll computes the OI-trend arrow against an in-memory reference `Map<coin,{oiNotional,ts}>` (the ~window-ago value), refreshed when each snapshot rolls. A ~60s-stale reference is negligible against a 15–30 min trend window. Rejected: per-coin SQLite queries on every poll (~178 × 30/min — wasteful on 1 vCPU).*
   - ***Pinned `better-sqlite3@^11.10.0` over latest v12.*** *Trigger: `npm install better-sqlite3` (v12.11.1) failed here — no prebuilt binary for Node 20.9.0/arm64, and the source fallback died on Python 3.13's removed `distutils` (old bundled node-gyp@9.4.0). v11.10.0 installs from a prebuilt binary (verified: loads + runs queries), so **no compiler toolchain is needed locally or on the droplet** — lower footprint and attack surface on the box that co-hosts the blog (§8.5 / CLAUDE.md #1), and v11 is sufficient for our single-writer use. Do NOT naively bump to v12 without solving the prebuild/toolchain story first. `package-lock.json` is committed so the droplet installs the exact same version.*
   - ***Dependency isolation.*** *All backend deps are project-local in `backend/node_modules`, installed under the service user's own directory — never system-wide, no global installs (§8.5 blast-radius isolation). The SQLite file likewise lives in its own dir (`OI_DB_PATH`, default `./data/`).*
+- *2026-06-24 — Phase 3 decisions:*
+  - ***Plain CSS + inline styles, no Tailwind.*** *The design is token-driven (CSS custom properties) with per-row OKLCH colors computed in JS (`skewColor(side,t)`). Tokens live as global CSS; dynamic per-row colors use inline style objects — mirroring the mockup exactly. Tailwind would fight the runtime OKLCH ramp and add tooling for no gain. Rejected: Tailwind, CSS-in-JS libs.*
+  - ***Static export (`output:'export'`).*** *The dashboard is a client-rendered SPA that streams from `api.niminal.xyz`; it ships as static assets on Vercel (SPEC §6). No server runtime needed on the frontend. Verified `next build` emits `out/`.*
+  - ***Frontend has zero deps beyond Next/React.*** *No chart lib yet (sparklines are Phase 5), no state lib (React state suffices). Keeps the bundle and supply-chain surface minimal.*
+  - ***Dev cross-origin: real CORS, no proxy.*** *Local dev hits the backend directly via `NEXT_PUBLIC_STREAM_URL`; run the backend with `CORS_ORIGIN=http://localhost:3000`. Exercises the true cross-origin/SSE path rather than masking it behind a dev proxy. Documented in `frontend/.env.local.example`.*
+  - ***Next 16 note:*** *create-next-app pulled Next 16 (breaking changes vs training data — flagged by its AGENTS.md). Verified `next/font/google` and `output:'export'` against the bundled docs before building. EBADENGINE warning (an ESLint transitive dep prefers Node ≥20.19; we're on 20.9) is non-blocking — build is green.*
