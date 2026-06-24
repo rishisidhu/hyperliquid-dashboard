@@ -233,8 +233,9 @@ Base URL: `https://api.hyperliquid.xyz`
 3. Frontend board — sortable table + headline strip (funding × OI weighted).
 4. OI trend UI — arrows + "warming up" state.
 5. Signature feature — `predictedFundings` panel + `fundingHistory` sparklines.
-6. Education layer — tooltips, skew copy, "how to read", microcopy; descriptive-only.
-7. Polish — OI-cap flags, reconnect/backoff, stale labeling.
+6. Education layer — **real tooltips on every term** (funding, premium, OI, crowd skew, annualized, OI-trend); the **"How to read this board"** control opens an **actual panel** (Phase 3 ships it as a non-functional stub); skew-badge copy, headline microcopy; descriptive-only, no buy/sell.
+7. Polish — OI-cap flags, reconnect/backoff, stale labeling, **+ board density/UX** (focused Top-N default that never hides large markets — see §12 board-density spec).
+7.5 **Theming (light mode)** — light-palette counterpart for the existing CSS-variable tokens under a theme selector (`data-theme` / `prefers-color-scheme`); session-persisted toggle; re-tuned OKLCH lightness for the skew ramp so teal/amber stay legible + colorblind-safe on light. After polish, before deploy.
 8. **Security hardening** — implement all §8.5 controls; verify Node is localhost-only, CORS locked, resource caps active, no info leakage.
 9. **Deploy / cutover** — Vercel frontend replace + `api.niminal.xyz` backend per §8; verify blog unaffected.
 10. (v2) sector grouping, alerts, mobile, abuse logging.
@@ -308,18 +309,31 @@ Base URL: `https://api.hyperliquid.xyz`
 - *Notes:*
 
 ### Phase 6 — Education layer
-- ⬜ Term tooltips
+- ⬜ Real tooltips on **every** term: funding, premium, OI, crowd skew, annualized, OI-trend (one plain sentence + what it means for a trade)
 - ⬜ Skew-badge plain-language copy
-- ⬜ "How to read this board" expandable
+- ⬜ "How to read this board" control opens an **actual panel** (Phase 3 ships it as a non-functional stub button)
 - ⬜ Headline microcopy
 - ⬜ Tone review: descriptive-only, no advice
 - *Notes:*
+  - *2026-06-24 — Scope locked: tooltips must cover every term listed above; the "How to read this board" button is intentionally a **non-functional stub in Phase 3** and tooltips are intentionally **absent** in Phase 3 — both are expected and resolved here in Phase 6. Copy stays descriptive, never prescriptive (no buy/sell).*
 
 ### Phase 7 — Polish
 - ⬜ OI-cap flags
 - ⬜ Reconnect-with-backoff + REST fallback
 - ⬜ Stale-data labeling
+- ⬜ **Board density/UX** — focused Top-N default that never hides large markets (full spec below)
+  - ⬜ Default **Top 25**, ranked by a blend of crowd intensity **and** market size (OI) — large markets are never excluded purely for being balanced (a high-OI, neutral-funding market like SOL stays visible)
+  - ⬜ Top-N selector: **10 / 25 / 50 / All**; "All" always available (preserves complete-market credibility)
+  - ⬜ "Hide balanced" as an **opt-in** toggle (OFF by default); even when ON, apply a **minimum open-interest floor** so significant balanced markets stay visible — only the small/illiquid/balanced tail is hidden. OI floor is a **configurable constant**.
+  - ⬜ List virtualization — **deferred, conditional**: implement only if "All" (≈230 rows) doesn't render smoothly (see §12 trigger).
 - *Notes:*
+
+### Phase 7.5 — Theming (light mode)
+- ⬜ Light-palette counterpart for the existing CSS-variable tokens under a theme selector (`data-theme` and/or `prefers-color-scheme`)
+- ⬜ Theme toggle, persisted in-session
+- ⬜ Re-tuned OKLCH lightness for the skew ramp so teal/amber stay legible + colorblind-safe on a light background
+- *Notes:*
+  - *2026-06-24 — Sequenced after Phase 7 polish, before Phase 9 deploy. Cheap because the frontend already references CSS-variable tokens (not hardcoded colors), so a second palette is mostly a token-set swap — the only real work is re-tuning the OKLCH skew ramp for light backgrounds.*
 
 ### Phase 8 — Security hardening (§8.5)
 - ⬜ Node bound to 127.0.0.1 only; nginx sole public door
@@ -348,8 +362,8 @@ Base URL: `https://api.hyperliquid.xyz`
 
 ### Open questions
 - ⬜ Poll-first vs WS-first upstream? (Recommend REST poll first.)
-- ⬜ Skew-badge thresholds (inspect live funding distribution).
-- ⬜ Headline weighting funding vs funding × OI? (Recommend × OI.)
+- ⬜ Skew-badge thresholds (inspect live funding distribution). **Still open** — and the funding-clamp data-reality note (below, 2026-06-24) should inform tuning: with ~40% of coins pinned at the funding cap and ~23% at exactly zero, simple symmetric `%`-of-annualized thresholds may bucket most of the tail into two spikes. Consider intensity that accounts for the cap and/or blends OI.
+- ⬜ Headline weighting funding vs funding × OI? (Recommend × OI.) **Note:** Phase 3 frontend currently ranks the strip by `skew.intensity` desc per the locked design; backend still emits a funding×OI `headlines` field. Reconcile here.
 - ⬜ api.niminal.xyz behind Cloudflare or direct? (Direct A record to start; buffering proxies can break SSE.)
 - ⬜ Identify what owns the two Postgres clusters before deploy (avoid surprises).
 
@@ -370,3 +384,8 @@ Base URL: `https://api.hyperliquid.xyz`
   - ***Frontend has zero deps beyond Next/React.*** *No chart lib yet (sparklines are Phase 5), no state lib (React state suffices). Keeps the bundle and supply-chain surface minimal.*
   - ***Dev cross-origin: real CORS, no proxy.*** *Local dev hits the backend directly via `NEXT_PUBLIC_STREAM_URL`; run the backend with `CORS_ORIGIN=http://localhost:3000`. Exercises the true cross-origin/SSE path rather than masking it behind a dev proxy. Documented in `frontend/.env.local.example`.*
   - ***Next 16 note:*** *create-next-app pulled Next 16 (breaking changes vs training data — flagged by its AGENTS.md). Verified `next/font/google` and `output:'export'` against the bundled docs before building. EBADENGINE warning (an ESLint transitive dep prefers Node ≥20.19; we're on 20.9) is non-blocking — build is green.*
+- *2026-06-24 — Scope locks (no build this turn; recorded for future phases):*
+  - ***Board principle: relevance ≠ skew.*** *The board must NOT hide a large market just because its funding is neutral. The focused Top-N default (Phase 7) ranks by a blend of crowd intensity AND market size (OI), and "Hide balanced" is opt-in with a minimum-OI floor — so a high-OI balanced market (e.g. SOL at neutral funding) always stays visible. "All" is always selectable to preserve complete-market credibility. The OI floor is a configurable constant.*
+  - ***List virtualization deferred — explicit trigger.*** *Do NOT add virtualization preemptively. Implement it ONLY if the "All" view (~230 rows) does not scroll/update smoothly in practice. Until that trigger fires, plain rendering keeps the code simpler and avoids a dep.*
+  - ***Light mode is cheap by construction.*** *Because the frontend references CSS-variable tokens (not hardcoded colors), a light theme is mostly a second token set behind a `data-theme`/`prefers-color-scheme` selector; the only substantive work is re-tuning the OKLCH skew-ramp lightness so teal/amber stay legible + colorblind-safe on light. Sequenced as Phase 7.5 (after polish, before deploy).*
+  - ***Data reality — Hyperliquid clamps hourly funding.*** *Cap ≈ 0.0000125/hr → ±10.95% annualized. On a live 230-coin sample: **93 coins pinned at the cap**, **52 at exactly zero**. So raw funding alone has limited discriminating power across the long tail — which reinforces why the intensity/skew, OI-trend, and cross-venue (Phase 5) layers matter, and must inform tuning of the still-provisional skew thresholds (open question above).*
