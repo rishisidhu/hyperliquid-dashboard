@@ -6,7 +6,7 @@
 //   2. Null-safe: the live feed can carry null numerics (e.g. before a field is
 //      known); the mockup's fixtures never did. Missing numbers render as "—".
 
-import type { BoardRow, OiTrend, SkewSide } from "./types";
+import type { BoardRow, OiTrend } from "./types";
 import { pips, type Pip } from "./tokens";
 import { usd, pct, price } from "./format";
 
@@ -111,14 +111,10 @@ export function rowVM(r: BoardRow, stale: boolean, staleAge: string): RowVM {
 }
 
 // ── Headline strip ──────────────────────────────────────────────────────────
-// Locked design: rank by skew.intensity desc, exclude balanced/stale rows.
-// (Backend also emits funding×OI headlines; reconciling the two is the SPEC §12
-//  open question — deferred. The design wins for now.)
-export function headline(rows: BoardRow[], side: SkewSide): BoardRow[] {
-  return rows
-    .filter((r) => r.skew.side === side)
-    .sort((a, b) => b.skew.intensity - a.skew.intensity);
-}
+// Ranking is now CANONICAL in the backend (deriveHeadlines, R1: |ann %| desc
+// above the OI floor, tiebreak OI desc then coin). The frontend consumes
+// board.headlines directly — single source of truth (SPEC §12 resolved). We no
+// longer recompute ordering here.
 
 export interface HeadlineItem {
   coin: string;
@@ -140,16 +136,23 @@ export function hlItem(r: BoardRow): HeadlineItem {
   };
 }
 
-// Descriptive, never prescriptive (no buy/sell). Ported from interp().
-export function interp(r: BoardRow): string {
+// Descriptive, never prescriptive (no buy/sell).
+// Superlative ("the most one-sided book on the board") fires ONLY for the
+// rank-1 headline item (isTop) — never just because intensity ≥ some threshold —
+// so it can't contradict the numbers beside it. A magnitude floor (t ≥ 0.6) also
+// keeps it from over-claiming on a mild top; lower magnitudes get plain copy
+// re-expressed against the new log intensity.
+export function interp(r: BoardRow, isTop: boolean): string {
   const t = r.skew.intensity;
   const f = Math.abs(r.annualizedFundingPct ?? 0).toFixed(1);
   const qual =
-    t >= 0.6
+    isTop && t >= 0.6
       ? "the most one-sided book on the board"
-      : t >= 0.3
+      : t >= 0.6
         ? "a heavily crowded book"
-        : "a mild lean";
+        : t >= 0.35
+          ? "a notably crowded book"
+          : "a mild lean";
   if (r.skew.side === "long")
     return `Longs are paying ${f}% a year to hold ${r.coin} — ${qual}.`;
   return `Shorts are paying ${f}% a year to stay short ${r.coin} — ${qual}.`;

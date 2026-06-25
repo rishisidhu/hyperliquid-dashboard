@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useStream, useNow } from "@/lib/useStream";
-import { headline, hlItem, interp } from "@/lib/viewModel";
+import { hlItem, interp } from "@/lib/viewModel";
 import { TopBar } from "@/components/TopBar";
 import { HeadlineStrip } from "@/components/HeadlineStrip";
 import { Board } from "@/components/Board";
@@ -36,15 +36,17 @@ export default function Page() {
     return rows.filter((r) => r.coin.toUpperCase().includes(q));
   }, [rows, query]);
 
-  // Headlines: by intensity desc per the locked design (computed from rows).
-  const longs = useMemo(() => headline(rows, "long"), [rows]);
-  const shorts = useMemo(() => headline(rows, "short"), [rows]);
+  // Headlines come canonically from the backend (R1 ranking + OI floor) — single
+  // source of truth. We just render them; no client-side re-ranking.
+  const longs = board?.headlines.mostCrowdedLongs ?? [];
+  const shorts = board?.headlines.mostCrowdedShorts ?? [];
 
+  // interp's superlative fires only for the rank-1 (top) item (isTop = true).
   const longTop = longs[0]
-    ? { ...hlItem(longs[0]), interp: interp(longs[0]) }
+    ? { ...hlItem(longs[0]), interp: interp(longs[0], true) }
     : null;
   const shortTop = shorts[0]
-    ? { ...hlItem(shorts[0]), interp: interp(shorts[0]) }
+    ? { ...hlItem(shorts[0]), interp: interp(shorts[0], true) }
     : null;
   const longRest = longs.slice(1, 3).map(hlItem);
   const shortRest = shorts.slice(1, 3).map(hlItem);
