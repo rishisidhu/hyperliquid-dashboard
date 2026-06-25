@@ -50,3 +50,29 @@ export interface Snapshot {
   stale: boolean;
   board: Board | null;
 }
+
+// ── Cross-venue predicted fundings (Phase 5, separate `predicted` SSE event) ──
+export interface PredictedVenue {
+  venue: string; // display name, e.g. "Hyperliquid"
+  code: string; // raw venue code, e.g. "HlPerp"
+  annualizedPct: number; // comparable across venues (annualized per interval)
+  intervalHours: number;
+  nextFundingTime: number | null;
+}
+
+export interface PredictedFundings {
+  updatedAt: number | null;
+  byCoin: Record<string, { venues: PredictedVenue[] }> | null;
+}
+
+// ── Funding-history sparkline (Phase 5, on-demand /funding-history) ──
+export interface FundingHistoryPoint {
+  time: number;
+  annualizedPct: number;
+}
+
+export interface FundingHistoryResponse {
+  coin: string;
+  points: FundingHistoryPoint[];
+  cachedAt: number;
+}
