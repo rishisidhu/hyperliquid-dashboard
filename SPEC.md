@@ -311,9 +311,15 @@ Base URL: `https://api.hyperliquid.xyz`
   - *Visual confirmation of glyph/color/word/pct deferred to the operator's own browser (headless-Chrome screenshot was unreliable here — no `timeout` binary on macOS, and a running user Chrome locked the default profile). The frontend renders these states via the unit-covered `trendVM`; Phase 3 already screenshotted the same component in its warming state.*
 
 ### Phase 5 — Signature feature
-- ⬜ `predictedFundings` cross-venue panel
-- ⬜ `fundingHistory` sparklines (cached)
+- ✅ `predictedFundings` cross-venue panel
+- ✅ `fundingHistory` sparklines (cached)
 - *Notes:*
+  - *2026-06-25 — Phase 5 complete. Backend: `predictedPoller` (slow ~60s, fixed body — no user input) → `derivePredicted` annualizes each venue by its own interval (HL 1h vs Binance/Bybit 8h: `rate × 24/intervalHours × 365 × 100`) so HL/Binance/Bybit are comparable → fanned out on a **separate named `predicted` SSE event** (emitted on refresh + on connect), keeping the 2s board frame lean. `GET /funding-history?coin=` serves annualized hourly points from a per-coin ~5min cache with in-flight dedupe. Frontend: row-expand reveals a cross-venue panel + an inline SVG sparkline (zero deps); cross-venue map consumed from the `predicted` event, history fetched on expand (client cache). Zero new deps either side.*
+  - ***§8.5 — the one user-input path.*** *`predictedFundings`/`metaAndAssetCtxs` use fixed bodies (no SSRF surface). `/funding-history` is the sole endpoint taking user input: the `coin` is validated against the live universe allow-list (`cache.isKnownCoin`) plus a cheap pattern guard, and **never forwarded raw** — unknown/malformed → 400. Verified live: BTC → 200 (168 points); `NOTACOIN` and `%2e%2e%2fetc` → 400. Per-coin cache + dedupe preserve the fan-out principle (a popular coin = ~one upstream fetch per window).*
+  - ***Optimization (as planned): separate `predicted` SSE event, not in the 2s frame.*** *The cross-venue map (~230 coins × venues, ~57KB) is only needed on row-expand and only changes ~60s, so it rides a named event emitted on refresh + once on connect — vs bloating every 2s board frame. Board `message` stays lean.*
+  - ***Correctness — per-venue interval annualization*** *(tested): venues quote over different intervals, so raw rates aren't comparable; annualizing each by its own interval is what makes "HL vs Binance vs Bybit" valid. Verified live (BTC): Hyperliquid 10.95%/1h, Binance 3.11%/8h, Bybit −3.51%/8h. 28 backend tests pass (incl. interval annualization + cache/dedupe/TTL).*
+  - ***Descriptive-only held firmly*** *(per standing instruction): the cross-venue panel shows per-venue funding numbers + next-funding times only — no copy implying an action (no "cheaper to hold on X"). The user draws their own conclusion.*
+  - *Visual confirmation of the expanded panel deferred to the operator's browser — the headless-Chrome screenshot hangs here because the page's open EventSource keeps `--virtual-time-budget` from settling (and Node 20.9 has no global `WebSocket` for a CDP driver). Build is green (TypeScript validates the full render tree); backend data path verified live; SSR shell renders without error. To see it: expand any row in the running app.*
 
 ### Phase 6 — Education layer
 - ⬜ Real tooltips on **every** term: funding, premium, OI, crowd skew, annualized, OI-trend (one plain sentence + what it means for a trade)
