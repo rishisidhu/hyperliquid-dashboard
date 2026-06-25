@@ -275,6 +275,7 @@ Base URL: `https://api.hyperliquid.xyz`
   - *Seeded a few §8.5/Phase-7 guards early because they were cheap and structural (poll backoff, SSE client cap + 503, heartbeat, localhost bind, GET-only, CORS lock, no stack traces, bounded HTTP timeouts). Full hardening + OS-level isolation still belongs to Phase 8.*
   - *Crowd-skew thresholds in `derive.js` (balanced <5%, extreme ≥50% annualized) are **provisional placeholders**, clearly marked — open question below stays open pending live-distribution inspection.*
   - *OI trend arrow returns `null` for now (needs stored snapshots — Phase 2).*
+  - *2026-06-25 — Informal soak evidence (to cite at deploy): the backend ran continuously for several days during development with no crash, no memory growth/leak, and no Hyperliquid rate-limiting — consistent with the constant single-poller upstream footprint. Not a formal load test, but reassuring for the $6 shared box.*
 
 ### Phase 2 — Persistence
 - ✅ SQLite (`better-sqlite3`), own dir, unprivileged user
