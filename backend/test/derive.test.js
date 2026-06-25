@@ -13,11 +13,24 @@ test('crowdSkew classifies sides and balance', () => {
   assert.equal(crowdSkew(null).label, 'Unknown');
 });
 
-test('crowdSkew intensity scales 0..1 and clamps', () => {
-  assert.equal(crowdSkew(5).intensity, 0); // at balanced edge
-  assert.equal(crowdSkew(1000).intensity, 1); // clamped
-  const mid = crowdSkew(-1000).intensity;
-  assert.equal(mid, 1);
+test('crowdSkew intensity is a clamped log scale', () => {
+  assert.equal(crowdSkew(5).intensity, 0); // at the balanced edge (log10(5)-log10(5))
+  assert.equal(crowdSkew(700).intensity, 1); // at the extreme anchor
+  assert.equal(crowdSkew(1000).intensity, 1); // clamped beyond HI
+  assert.equal(crowdSkew(-1000).intensity, 1);
+});
+
+test('crowdSkew log scale stays monotonic + distinct across the extreme tail', () => {
+  // The whole point of the fix: 50/100/300/700% must NOT all saturate to 1.0.
+  const t = (v) => crowdSkew(v).intensity;
+  const vals = [10, 30, 50, 100, 300, 700].map(t);
+  for (let i = 1; i < vals.length; i++) {
+    assert.ok(vals[i] > vals[i - 1], `intensity must increase: ${vals[i - 1]} -> ${vals[i]}`);
+  }
+  assert.ok(Math.abs(t(50) - 0.466) < 0.01); // sanity vs the proposal table
+  // distinct pip buckets across the range (ceil(t*5)): 1,2,3,4,5
+  const pip = (v) => Math.max(1, Math.ceil(t(v) * 5));
+  assert.deepEqual([10, 30, 50, 100, 300].map(pip), [1, 2, 3, 4, 5]);
 });
 
 test('deriveRow annualizes funding and computes notional/change', () => {
@@ -54,20 +67,33 @@ test('deriveRow returns null without a ctx', () => {
   assert.equal(deriveRow({ name: 'X' }, undefined), null);
 });
 
-test('deriveHeadlines ranks by funding x OI and splits sides', () => {
+test('deriveHeadlines (R1) ranks by |ann %| desc above the OI floor', () => {
   const rows = [
-    { coin: 'A', annualizedFundingPct: 10, oiNotional: 1000 }, // long, score 10000
-    { coin: 'B', annualizedFundingPct: 50, oiNotional: 10 }, // long, score 500
-    { coin: 'C', annualizedFundingPct: -30, oiNotional: 2000 }, // short, score -60000
-    { coin: 'D', annualizedFundingPct: -5, oiNotional: 10 }, // short, score -50
-    { coin: 'E', annualizedFundingPct: null, oiNotional: 1 }, // excluded
+    { coin: 'BIG', annualizedFundingPct: 30, oiNotional: 5e6, skew: { side: 'long' } },
+    { coin: 'HUGE', annualizedFundingPct: 80, oiNotional: 2e6, skew: { side: 'long' } },
+    { coin: 'TINY', annualizedFundingPct: 500, oiNotional: 100, skew: { side: 'long' } }, // below floor
+    { coin: 'SH1', annualizedFundingPct: -106, oiNotional: 3e6, skew: { side: 'short' } },
+    { coin: 'SH2', annualizedFundingPct: -53, oiNotional: 9e6, skew: { side: 'short' } },
+    { coin: 'BAL', annualizedFundingPct: 1, oiNotional: 9e6, skew: { side: 'none' } }, // balanced
   ];
-  const { mostCrowdedLongs, mostCrowdedShorts } = deriveHeadlines(rows, 5);
-  assert.deepEqual(mostCrowdedLongs.map((r) => r.coin), ['A', 'B']);
-  assert.deepEqual(mostCrowdedShorts.map((r) => r.coin), ['C', 'D']);
+  const { mostCrowdedLongs, mostCrowdedShorts } = deriveHeadlines(rows, { oiFloorUsd: 1e6 });
+  // TINY's extreme funding doesn't lead — it's below the floor (illiquid).
+  assert.deepEqual(mostCrowdedLongs.map((r) => r.coin), ['HUGE', 'BIG']);
+  // The fix: more-extreme short leads, regardless of OI ordering (SH1 -106 > SH2 -53).
+  assert.deepEqual(mostCrowdedShorts.map((r) => r.coin), ['SH1', 'SH2']);
 });
 
-test('deriveBoard skips delisted and builds headlines', () => {
+test('deriveHeadlines tiebreak: OI desc, then coin asc', () => {
+  const rows = [
+    { coin: 'BBB', annualizedFundingPct: 40, oiNotional: 2e6, skew: { side: 'long' } },
+    { coin: 'AAA', annualizedFundingPct: 40, oiNotional: 2e6, skew: { side: 'long' } },
+    { coin: 'CCC', annualizedFundingPct: 40, oiNotional: 5e6, skew: { side: 'long' } },
+  ];
+  const { mostCrowdedLongs } = deriveHeadlines(rows, { oiFloorUsd: 1e6 });
+  assert.deepEqual(mostCrowdedLongs.map((r) => r.coin), ['CCC', 'AAA', 'BBB']);
+});
+
+test('deriveBoard skips delisted and builds canonical headlines', () => {
   const meta = {
     universe: [
       { name: 'BTC', maxLeverage: 40 },
@@ -75,11 +101,11 @@ test('deriveBoard skips delisted and builds headlines', () => {
     ],
   };
   const ctxs = [
-    { funding: '0.0001', openInterest: '100', markPx: '50000', prevDayPx: '40000' },
+    { funding: '0.0001', openInterest: '100', markPx: '50000', prevDayPx: '40000' }, // OI $5M
     { funding: '0.0001', openInterest: '1', markPx: '1', prevDayPx: '1' },
   ];
-  const board = deriveBoard({ meta, ctxs });
+  const board = deriveBoard({ meta, ctxs }); // default floor $1M
   assert.equal(board.coinCount, 1);
   assert.equal(board.rows[0].coin, 'BTC');
-  assert.ok(board.headlines.mostCrowdedLongs.length >= 0);
+  assert.equal(board.headlines.mostCrowdedLongs[0].coin, 'BTC');
 });

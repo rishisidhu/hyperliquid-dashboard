@@ -69,4 +69,9 @@ export const config = {
   oiTrendWindowMs: intEnv('OI_TREND_WINDOW_MS', 1200000),
   // Below this |%| change the trend reads "flat" (noise deadband).
   oiTrendDeadbandPct: floatEnv('OI_TREND_DEADBAND_PCT', 1.0),
+
+  // Minimum OI notional ($) for a market to count as "significant": headline
+  // eligibility floor (derive.js) and the shared Phase-7 board-density floor.
+  // Default $1M cleanly separates the illiquid micro-market tail.
+  oiFloorUsd: floatEnv('OI_FLOOR_USD', 1_000_000),
 };

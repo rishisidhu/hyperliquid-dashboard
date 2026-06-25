@@ -1,12 +1,24 @@
 // Pure derivation: raw Hyperliquid [meta, ctxs] -> the dashboard board model.
 // No I/O here so it stays trivially testable.
 
-// --- Provisional crowd-skew thresholds (annualized funding, %). -------------
-// These are PLACEHOLDERS pending inspection of the live funding distribution
-// (SPEC §12 open question — intentionally left open). Tune against real data
-// later; do not treat these numbers as settled.
-const SKEW_BALANCED_MAX = 5; // |annualized %| below this => "Balanced"
-const SKEW_EXTREME_MIN = 50; // |annualized %| above this => "extreme" intensity
+// --- Crowd-skew intensity scale (annualized funding, %). --------------------
+// LOG scale (SPEC §12, resolved 2026-06-25). Hyperliquid funding is NOT clamped
+// near ±11% — it's effectively unbounded (observed past ±700%), with a long thin
+// tail. A linear cut-off at ±50% saturated that whole tail to intensity 1.0,
+// blinding both the pip ramp and the headline ranking. A log map keeps the
+// common 10–50% range AND the extreme tail visually distinct, with FIXED anchors
+// (stable + comparable over time, unlike a percentile/rank scale).
+//   |ann%| < BALANCED_ANN_PCT        => Balanced (intensity 0, neutral axis tick)
+//   intensity = (log10(mag) − log10(LO)) / (log10(HI) − log10(LO)), clamped 0..1
+const BALANCED_ANN_PCT = 5; // below this => "Balanced"
+const EXTREME_ANN_PCT = 700; // at/above this => intensity 1.0 (covers observed max)
+const LOG_LO = Math.log10(BALANCED_ANN_PCT);
+const LOG_HI = Math.log10(EXTREME_ANN_PCT);
+
+// Minimum OI notional ($) for a market to be "significant" — used as the
+// headline eligibility floor here, and shared with the Phase-7 board-density
+// filter. Overridable per deploy (poller passes config.oiFloorUsd).
+const DEFAULT_OI_FLOOR_USD = 1_000_000;
 
 // Hourly funding rate -> annualized percent. SPEC §4.2: funding × 24 × 365.
 const HOURS_PER_YEAR = 24 * 365;
@@ -19,21 +31,21 @@ function num(v) {
 /**
  * Classify crowd skew from annualized funding.
  * Positive funding => longs pay shorts => the crowd leans long (SPEC §3).
- * Returns { label, side, intensity } where intensity 0..1 scales colour.
+ * Returns { label, side, intensity } where intensity 0..1 (log) scales colour.
  */
 export function crowdSkew(annualizedPct) {
   if (annualizedPct == null) {
     return { label: 'Unknown', side: 'none', intensity: 0 };
   }
   const mag = Math.abs(annualizedPct);
-  // 0 at the balanced edge, 1 at the extreme edge; clamped.
-  const intensity = Math.min(
-    1,
-    Math.max(0, (mag - SKEW_BALANCED_MAX) / (SKEW_EXTREME_MIN - SKEW_BALANCED_MAX)),
-  );
-  if (mag < SKEW_BALANCED_MAX) {
+  if (mag < BALANCED_ANN_PCT) {
     return { label: 'Balanced', side: 'none', intensity: 0 };
   }
+  // Log map between the balanced edge and the extreme anchor; clamp beyond HI.
+  const intensity = Math.min(
+    1,
+    Math.max(0, (Math.log10(mag) - LOG_LO) / (LOG_HI - LOG_LO)),
+  );
   return annualizedPct > 0
     ? { label: 'Longs crowded', side: 'long', intensity }
     : { label: 'Shorts crowded', side: 'short', intensity };
@@ -77,23 +89,39 @@ export function deriveRow(uni, ctx) {
 }
 
 /**
- * Headline strip (SPEC §4.1): most crowded longs / shorts.
- * Weighted by open interest so a tiny coin with extreme funding can't dominate
- * (SPEC §12 recommendation: funding × OI). Score = annualizedFunding × oiNotional.
+ * Headline strip (SPEC §4.1): most crowded longs / shorts. CANONICAL ranking —
+ * the frontend consumes this rather than recomputing (single source of truth,
+ * SPEC §12 reconciliation resolved 2026-06-25).
+ *
+ * R1: rank by |annualized %| desc among markets above a minimum-OI eligibility
+ * floor (so an illiquid micro-market with extreme funding can't lead). Ranking
+ * by the same number the card displays keeps each card internally consistent and
+ * the "most one-sided book" superlative literally true. Tiebreak: OI desc, then
+ * coin asc (deterministic — fixes the old intensity-tie input-order fallthrough).
  */
-export function deriveHeadlines(rows, topN = 5) {
-  const scored = rows
-    .filter((r) => r.annualizedFundingPct != null && r.oiNotional != null)
-    .map((r) => ({ ...r, crowdScore: r.annualizedFundingPct * r.oiNotional }));
+export function deriveHeadlines(rows, { oiFloorUsd = DEFAULT_OI_FLOOR_USD, topN = 5 } = {}) {
+  const eligible = rows.filter(
+    (r) =>
+      r.annualizedFundingPct != null &&
+      r.oiNotional != null &&
+      r.oiNotional >= oiFloorUsd,
+  );
 
-  const longs = scored
-    .filter((r) => r.crowdScore > 0)
-    .sort((a, b) => b.crowdScore - a.crowdScore)
+  const byMagnitude = (a, b) => {
+    const d = Math.abs(b.annualizedFundingPct) - Math.abs(a.annualizedFundingPct);
+    if (d !== 0) return d;
+    const oi = b.oiNotional - a.oiNotional; // OI desc
+    if (oi !== 0) return oi;
+    return a.coin.localeCompare(b.coin); // coin asc
+  };
+
+  const longs = eligible
+    .filter((r) => r.skew.side === 'long')
+    .sort(byMagnitude)
     .slice(0, topN);
-
-  const shorts = scored
-    .filter((r) => r.crowdScore < 0)
-    .sort((a, b) => a.crowdScore - b.crowdScore)
+  const shorts = eligible
+    .filter((r) => r.skew.side === 'short')
+    .sort(byMagnitude)
     .slice(0, topN);
 
   return { mostCrowdedLongs: longs, mostCrowdedShorts: shorts };
@@ -102,8 +130,9 @@ export function deriveHeadlines(rows, topN = 5) {
 /**
  * Full board model from a raw { meta, ctxs } snapshot.
  * universe[i] is parallel-indexed with ctxs[i].
+ * @param {{oiFloorUsd?: number}} [opts] headline eligibility floor (poller passes config).
  */
-export function deriveBoard({ meta, ctxs }) {
+export function deriveBoard({ meta, ctxs }, opts = {}) {
   const rows = [];
   for (let i = 0; i < meta.universe.length; i++) {
     const uni = meta.universe[i];
@@ -114,7 +143,7 @@ export function deriveBoard({ meta, ctxs }) {
   }
   return {
     rows,
-    headlines: deriveHeadlines(rows),
+    headlines: deriveHeadlines(rows, { oiFloorUsd: opts.oiFloorUsd }),
     coinCount: rows.length,
   };
 }
