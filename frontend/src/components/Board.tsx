@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { BoardRow } from "@/lib/types";
+import { Fragment, useMemo, useState } from "react";
+import type { BoardRow, PredictedFundings } from "@/lib/types";
 import { rowVM } from "@/lib/viewModel";
 import { Pips } from "./Pips";
+import { RowDetail } from "./RowDetail";
 
 const mono = "var(--font-num)";
 
@@ -70,11 +71,13 @@ interface BoardProps {
   stale: boolean;
   staleAge: string;
   marketCount: number;
+  predicted: PredictedFundings | null;
 }
 
-export function Board({ rows, stale, staleAge, marketCount }: BoardProps) {
+export function Board({ rows, stale, staleAge, marketCount, predicted }: BoardProps) {
   const [sortKey, setSortKey] = useState<SortKey>("intensity");
   const [dir, setDir] = useState<Dir>("desc");
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const sorted = useMemo(() => {
     const acc = accessors[sortKey];
@@ -168,10 +171,14 @@ export function Board({ rows, stale, staleAge, marketCount }: BoardProps) {
         {/* rows */}
         {sorted.map((r) => {
           const vm = rowVM(r, stale, staleAge);
+          const isOpen = expanded === r.coin;
           return (
+            <Fragment key={r.coin}>
             <div
-              key={r.coin}
               className="board-row"
+              onClick={() => setExpanded(isOpen ? null : r.coin)}
+              role="button"
+              aria-expanded={isOpen}
               style={{
                 display: "grid",
                 gridTemplateColumns: "var(--board-cols)",
@@ -181,6 +188,8 @@ export function Board({ rows, stale, staleAge, marketCount }: BoardProps) {
                 padding: "7px 16px",
                 borderBottom: "1px solid var(--border)",
                 opacity: vm.dim,
+                cursor: "pointer",
+                background: isOpen ? "var(--surface-2)" : undefined,
               }}
             >
               {/* market */}
@@ -333,6 +342,10 @@ export function Board({ rows, stale, staleAge, marketCount }: BoardProps) {
                 )}
               </div>
             </div>
+            {isOpen && (
+              <RowDetail coin={r.coin} venues={predicted?.byCoin?.[r.coin]?.venues ?? null} />
+            )}
+            </Fragment>
           );
         })}
       </div>

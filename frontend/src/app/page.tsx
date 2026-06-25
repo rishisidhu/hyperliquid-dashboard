@@ -22,7 +22,7 @@ function staleAgeStr(ms: number, fromMs: number | null): string {
 }
 
 export default function Page() {
-  const { snapshot, connected } = useStream();
+  const { snapshot, predicted, connected } = useStream();
   const now = useNow(1000);
   const [query, setQuery] = useState("");
 
@@ -78,6 +78,7 @@ export default function Page() {
               stale={stale}
               staleAge={staleAge}
               marketCount={board.coinCount}
+              predicted={predicted}
             />
           </>
         ) : (
