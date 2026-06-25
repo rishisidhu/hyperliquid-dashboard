@@ -3,6 +3,11 @@
 // payload chosen over deltas — SPEC §12 decision). Includes the §8.5 DoS
 // guards seeded early: hard client cap (-> 503) and heartbeat to drop dead
 // sockets.
+//
+// Cross-venue predicted fundings ride a SEPARATE named `predicted` event,
+// emitted only when they refresh (~60s) + once on connect — so the 2s board
+// frame stays lean instead of carrying the ~57KB cross-venue map every tick
+// (SPEC §12 optimization).
 
 import { config } from './config.js';
 import { cache } from './cache.js';
@@ -12,16 +17,19 @@ export class SseHub {
     this.clients = new Set(); // Set<ServerResponse>
     this.heartbeat = null;
     this.onUpdate = (snapshot) => this.broadcast(snapshot);
+    this.onPredicted = (snapshot) => this.broadcastPredicted(snapshot);
   }
 
   start() {
     cache.on('update', this.onUpdate);
+    cache.on('predicted-update', this.onPredicted);
     this.heartbeat = setInterval(() => this.#ping(), config.sseHeartbeatMs);
     this.heartbeat.unref?.();
   }
 
   stop() {
     cache.off('update', this.onUpdate);
+    cache.off('predicted-update', this.onPredicted);
     if (this.heartbeat) clearInterval(this.heartbeat);
     for (const res of this.clients) res.end();
     this.clients.clear();
@@ -52,9 +60,11 @@ export class SseHub {
 
     this.clients.add(res);
 
-    // Send last-known state right away if we have it.
+    // Send last-known state right away if we have it (board + cross-venue).
     const snap = cache.snapshot();
     if (snap.board) this.#send(res, snap);
+    const pred = cache.predictedSnapshot();
+    if (pred.byCoin) this.#sendEvent(res, 'predicted', pred);
 
     const drop = () => {
       this.clients.delete(res);
@@ -73,8 +83,21 @@ export class SseHub {
     }
   }
 
+  broadcastPredicted(snapshot) {
+    for (const res of this.clients) {
+      if (!res.writableEnded) this.#sendEvent(res, 'predicted', snapshot);
+    }
+  }
+
   #send(res, snapshot) {
     if (!res.writableEnded) res.write(`data: ${JSON.stringify(snapshot)}\n\n`);
+  }
+
+  // Named SSE event (e.g. `predicted`) — the client listens via addEventListener.
+  #sendEvent(res, event, payload) {
+    if (!res.writableEnded) {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+    }
   }
 
   // Comment-line heartbeat keeps intermediaries from closing idle streams and

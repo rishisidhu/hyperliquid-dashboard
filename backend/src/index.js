@@ -3,18 +3,23 @@
 
 import { config } from './config.js';
 import { Poller } from './poller.js';
+import { PredictedPoller } from './predictedPoller.js';
 import { SseHub } from './sse.js';
 import { Snapshotter } from './snapshotter.js';
+import { FundingHistoryService } from './fundingHistory.js';
 import { createApp } from './server.js';
 
 const snapshotter = new Snapshotter();
 const poller = new Poller({ trendSource: snapshotter });
+const predictedPoller = new PredictedPoller();
 const sseHub = new SseHub();
-const server = createApp(sseHub);
+const fundingHistory = new FundingHistoryService();
+const server = createApp(sseHub, fundingHistory);
 
 snapshotter.start();
 sseHub.start();
 poller.start();
+predictedPoller.start();
 
 server.listen(config.port, config.host, () => {
   console.log(
@@ -29,6 +34,7 @@ function shutdown(signal) {
   shuttingDown = true;
   console.log(`[server] ${signal} — shutting down`);
   poller.stop();
+  predictedPoller.stop();
   sseHub.stop();
   snapshotter.stop();
   server.close(() => process.exit(0));

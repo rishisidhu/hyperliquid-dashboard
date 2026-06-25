@@ -74,4 +74,14 @@ export const config = {
   // eligibility floor (derive.js) and the shared Phase-7 board-density floor.
   // Default $1M cleanly separates the illiquid micro-market tail.
   oiFloorUsd: floatEnv('OI_FLOOR_USD', 1_000_000),
+
+  // --- Phase 5: cross-venue funding + funding-history sparklines ----------
+  // Cross-venue poll cadence. Funding is hourly, so polling slowly is plenty
+  // (SPEC §4.3) — no need to hammer Hyperliquid.
+  predictedFundingsIntervalMs: intEnv('PREDICTED_FUNDINGS_INTERVAL_MS', 60000),
+  // Per-coin funding-history cache TTL — serve repeated expands from cache so a
+  // popular coin triggers ~one upstream fetch per window (SPEC §4.4 fan-out).
+  fundingHistoryTtlMs: intEnv('FUNDING_HISTORY_TTL_MS', 300000),
+  // How far back the sparkline reaches (hourly samples from Hyperliquid).
+  fundingHistoryLookbackHours: intEnv('FUNDING_HISTORY_LOOKBACK_HOURS', 168),
 };
