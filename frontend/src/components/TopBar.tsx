@@ -2,6 +2,7 @@
 
 interface TopBarProps {
   connected: boolean;
+  stale: boolean; // backend serving last-known during an upstream blip
   updatedAgo: string | null; // e.g. "2s ago" or null when never connected
   marketCount: number;
   query: string;
@@ -13,12 +14,20 @@ const mono = "var(--font-num)";
 
 export function TopBar({
   connected,
+  stale,
   updatedAgo,
   marketCount,
   query,
   onQuery,
   onHowToRead,
 }: TopBarProps) {
+  // Three states: reconnecting (stream down) · stale (connected but upstream
+  // blip, serving last-known) · live (connected + fresh).
+  const status = !connected
+    ? { color: "var(--stale)", pulse: false, text: "reconnecting…" }
+    : stale
+      ? { color: "var(--stale)", pulse: false, text: `stale · last updated ${updatedAgo ?? "—"}` }
+      : { color: "var(--rising)", pulse: true, text: `live · updated ${updatedAgo ?? "—"}` };
   return (
     <div
       style={{
@@ -68,18 +77,12 @@ export function TopBar({
             width: 7,
             height: 7,
             borderRadius: "50%",
-            background: connected ? "var(--rising)" : "var(--stale)",
-            boxShadow: `0 0 0 3px color-mix(in oklch, ${
-              connected ? "var(--rising)" : "var(--stale)"
-            }, transparent 80%)`,
-            animation: connected ? "pulse 2s ease-in-out infinite" : "none",
+            background: status.color,
+            boxShadow: `0 0 0 3px color-mix(in oklch, ${status.color}, transparent 80%)`,
+            animation: status.pulse ? "pulse 2s ease-in-out infinite" : "none",
           }}
         />
-        <span style={{ fontFamily: mono }}>
-          {connected
-            ? `live · updated ${updatedAgo ?? "—"}`
-            : "reconnecting…"}
-        </span>
+        <span style={{ fontFamily: mono }}>{status.text}</span>
       </div>
       <div
         style={{

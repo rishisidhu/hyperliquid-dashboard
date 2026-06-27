@@ -60,6 +60,7 @@ export default function Page() {
     <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
       <TopBar
         connected={connected}
+        stale={stale}
         updatedAgo={updatedAgo}
         marketCount={board?.coinCount ?? 0}
         query={query}
