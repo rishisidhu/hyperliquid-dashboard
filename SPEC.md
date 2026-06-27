@@ -337,15 +337,23 @@ Base URL: `https://api.hyperliquid.xyz`
   - ***Verification:*** *zero new deps; `next build` green (TypeScript validates the full render tree incl. panel + tooltips); panel + footer confirmed in SSR output. Visual confirmation of the open panel / live tooltips deferred to the operator's browser — headless-Chrome `--screenshot` hangs because the page's open EventSource keeps `--virtual-time-budget` from settling (same as Phases 4–5).*
 
 ### Phase 7 — Polish
-- ⬜ OI-cap flags
-- ⬜ Reconnect-with-backoff + REST fallback
-- ⬜ Stale-data labeling
-- ⬜ **Board density/UX** — focused Top-N default that never hides large markets (full spec below)
-  - ⬜ Default **Top 25**, ranked by a blend of crowd intensity **and** market size (OI) — large markets are never excluded purely for being balanced (a high-OI, neutral-funding market like SOL stays visible)
-  - ⬜ Top-N selector: **10 / 25 / 50 / All**; "All" always available (preserves complete-market credibility)
-  - ⬜ "Hide balanced" as an **opt-in** toggle (OFF by default); even when ON, apply a **minimum open-interest floor** so significant balanced markets stay visible — only the small/illiquid/balanced tail is hidden. OI floor is a **configurable constant**.
-  - ⬜ List virtualization — **deferred, conditional**: implement only if "All" (≈230 rows) doesn't render smoothly (see §12 trigger).
+- ✅ OI-cap flags
+- ✅ Reconnect-with-backoff + REST fallback
+- ✅ Stale-data labeling
+- ✅ **Board density/UX** — focused Top-N default that never hides large markets
+  - ✅ Default **Top 25** via a guarantee blend (top-OI always included, rest filled by intensity, deduped) — a high-OI balanced market (ETH) is never dropped
+  - ✅ Top-N selector: **10 / 25 / 50 / All**; "All" always available
+  - ✅ "Hide balanced" **opt-in** toggle (OFF default) with a min-OI floor — only the small/illiquid/balanced tail is hidden; big balanced markets stay
+  - ⬜ List virtualization — **deferred, conditional** (trigger logged below; not needed yet)
 - *Notes:*
+  - *2026-06-28 — Phase 7 complete (5 commits: backend floors/OI-cap/`/board`; FE density; FE OI-cap badge; FE reconnect/stale; §12).*
+  - ***Two OI floors (decision: "credibility of the hero vs completeness of the board").*** *Board SIGNIFICANCE floor `OI_FLOOR_USD=$1M` answers "is this a real market?" — emitted in the payload as `board.oiFloorUsd` and read by the frontend's hide-balanced filter (one shared constant). HEADLINE floor `HEADLINE_OI_FLOOR_USD=$10M` is higher so the marquee cards showcase liquid, credible crowding (ADA/TRUMP-class) rather than $2–4M froth. Pure-extremity ranking kept within the eligible set so the rank-1 "most one-sided book" superlative stays literally true (we deliberately did NOT blend size in — option C, rejected). A frothy small-cap like IP (+449%, ~$4.5M) still appears on the board and in its own row — just not as a headline hero unless it clears $10M. Graceful degradation: on a quiet day nothing clears $10M → that side shows no hero, and the superlative is intensity-gated so a mild leader is never called "most one-sided."*
+  - ***Density ranking = guarantee blend (relevance ≠ skew).*** *`lib/density.mjs` `selectTopN`: always include the top `ceil(N×0.4)` markets by OI, then fill remaining slots by crowd intensity desc, dedup. Explainable per row ("here because it's one of the biggest" OR "one of the most crowded") — chosen over an opaque additive score. Verified live: ETH (balanced, $1.1B) stays in Top-25; search escapes the limit (typing a coin searches all ~230).*
+  - ***OI-cap flag.*** *Slow ~45s fixed-body poller (`perpsAtOpenInterestCap`) stores the capped set; the 2s board poller stamps each row `atOiCap` (boolean — no payload bloat). FE shows a 🚫 AT CAP chip + InfoTip. **Live finding:** the entire current cap list (CANTO/FTM/JELLY/LOOM/RLB/ZEREBRO) is delisted coins absent from the active universe, so no badge shows right now — correct (a delisted market isn't tradeable). Stamping is unit-tested (capped ETH → `atOiCap:true`) and the live fetch+intersection verified.*
+  - ***Reconnect + REST fallback.*** *`useStream` layers a REST fallback on EventSource's native reconnect: if the stream stays down past a 5s grace, poll `GET /board` every 5s so the board never freezes; resume the stream on recovery. New backend `GET /board` returns the current snapshot (reuses the cache).*
+  - ***Stale labeling.*** *Top bar now has three states — live (connected+fresh, pulsing teal), stale (connected but `snapshot.stale` during an upstream blip, amber, "last updated Ns ago"), reconnecting (stream down). Per-row STALE chips/dimming from Phase 3 remain.*
+  - ***Virtualization deferral — explicit trigger:*** *render all rows plainly. Add windowing ONLY if the "All" view (~230 rows @ 2s updates) visibly janks (dropped frames / input lag on scroll). Not observed; not implemented. (The default Top-25 means most sessions render ≤25 rows anyway.)*
+  - ***Tests/deps:*** *`density.mjs` authored with JSDoc types (not `.ts`) so it unit-tests directly under `node --test` with **zero new deps** (the app imports it fully typed via `allowJs`+JSDoc). Backend 29 tests, frontend 5 density tests, all green; `next build` green. Visual confirmation of the new controls/badge deferred to the operator's browser (headless screenshot hangs on the open SSE stream, as in Phases 4–6).*
 
 ### Phase 7.5 — Theming (light mode)
 - ⬜ Light-palette counterpart for the existing CSS-variable tokens under a theme selector (`data-theme` and/or `prefers-color-scheme`)
