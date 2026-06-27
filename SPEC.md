@@ -322,13 +322,19 @@ Base URL: `https://api.hyperliquid.xyz`
   - *Visual confirmation of the expanded panel deferred to the operator's browser — the headless-Chrome screenshot hangs here because the page's open EventSource keeps `--virtual-time-budget` from settling (and Node 20.9 has no global `WebSocket` for a CDP driver). Build is green (TypeScript validates the full render tree); backend data path verified live; SSR shell renders without error. To see it: expand any row in the running app.*
 
 ### Phase 6 — Education layer
-- ⬜ Real tooltips on **every** term: funding, premium, OI, crowd skew, annualized, OI-trend (one plain sentence + what it means for a trade)
-- ⬜ Skew-badge plain-language copy
-- ⬜ "How to read this board" control opens an **actual panel** (Phase 3 ships it as a non-functional stub button)
-- ⬜ Headline microcopy
-- ⬜ Tone review: descriptive-only, no advice
+- ✅ Real tooltips on **every** term: funding, premium, OI, crowd skew, annualized, OI-trend (+ 24h, 24h vol, cross-venue, funding interval)
+- ✅ Skew-badge plain-language copy (badge already teaches; tooltip layers on top)
+- ✅ "How to read this board" control opens an **actual panel** (was a non-functional stub in Phase 3)
+- ✅ Headline microcopy (the rank-1 superlative / magnitude copy from the 2026-06-25 fix; interpretation lines under headline cards)
+- ✅ Tone review: descriptive-only, no advice
 - *Notes:*
   - *2026-06-24 — Scope locked: tooltips must cover every term listed above; the "How to read this board" button is intentionally a **non-functional stub in Phase 3** and tooltips are intentionally **absent** in Phase 3 — both are expected and resolved here in Phase 6. Copy stays descriptive, never prescriptive (no buy/sell).*
+  - *2026-06-28 — Phase 6 complete. The Phase-3 stub button and absent tooltips are now **resolved**: the header control opens a real modal panel, and every term carries a tooltip.*
+  - ***Mechanism:*** *`lib/glossary.ts` is the single source of all education copy (tooltips + panel both read it). `components/InfoTip.tsx` is a zero-dep accessible tooltip — a real `<button>` trigger reachable by **hover, focus (keyboard), and click (touch)**, with **Escape** and outside-pointerdown to close, `aria-describedby`/`role=tooltip` wiring, and `aria-expanded`. On sortable column headers it takes `stopPropagation` so the "i" affordance doesn't trigger a sort. Styled entirely from existing tokens (`--surface-3`, `--border-strong`, etc.).*
+  - ***Tooltips wired:*** *board headers (Crowd skew, Funding ann., Open int., 24h, 24h vol, OI trend) and the cross-venue panel (cross-venue, funding interval/next, annualized). Each entry = one plain sentence: definition + what it means for a trade.*
+  - ***Panel:*** *`HowToReadPanel.tsx` — modal `role=dialog`/`aria-modal`, backdrop + Escape close, focus moved to the close button on open. Sections: what the board shows · funding = crowd positioning · crowd skew & intensity · "What crowding does and doesn't tell you" · OI trend · cross-venue comparison · a "not financial advice" footer.*
+  - ***Tone:*** *held descriptive-only throughout. Per review, section 4 was reframed from "crowded ≠ doomed" (which implies a stance about holding) to **"What crowding does and doesn't tell you"** — describes the signal (concentration; stretched positioning can unwind sharply; no direction/timing), counsels nothing. No buy/sell anywhere.*
+  - ***Verification:*** *zero new deps; `next build` green (TypeScript validates the full render tree incl. panel + tooltips); panel + footer confirmed in SSR output. Visual confirmation of the open panel / live tooltips deferred to the operator's browser — headless-Chrome `--screenshot` hangs because the page's open EventSource keeps `--virtual-time-budget` from settling (same as Phases 4–5).*
 
 ### Phase 7 — Polish
 - ⬜ OI-cap flags
