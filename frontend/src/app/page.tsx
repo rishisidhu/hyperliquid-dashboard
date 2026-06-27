@@ -6,6 +6,7 @@ import { hlItem, interp } from "@/lib/viewModel";
 import { TopBar } from "@/components/TopBar";
 import { HeadlineStrip } from "@/components/HeadlineStrip";
 import { Board } from "@/components/Board";
+import { HowToReadPanel } from "@/components/HowToReadPanel";
 
 // Relative age, e.g. "2s ago" / "3m ago". Null when we have no timestamp.
 function ago(ms: number, fromMs: number | null): string | null {
@@ -25,6 +26,7 @@ export default function Page() {
   const { snapshot, predicted, connected } = useStream();
   const now = useNow(1000);
   const [query, setQuery] = useState("");
+  const [howToOpen, setHowToOpen] = useState(false);
 
   const board = snapshot?.board ?? null;
   const stale = snapshot?.stale ?? false;
@@ -62,7 +64,9 @@ export default function Page() {
         marketCount={board?.coinCount ?? 0}
         query={query}
         onQuery={setQuery}
+        onHowToRead={() => setHowToOpen(true)}
       />
+      <HowToReadPanel open={howToOpen} onClose={() => setHowToOpen(false)} />
 
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "26px 22px 90px" }}>
         {board ? (

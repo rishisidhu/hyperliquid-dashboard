@@ -6,6 +6,7 @@ interface TopBarProps {
   marketCount: number;
   query: string;
   onQuery: (q: string) => void;
+  onHowToRead: () => void;
 }
 
 const mono = "var(--font-num)";
@@ -16,6 +17,7 @@ export function TopBar({
   marketCount,
   query,
   onQuery,
+  onHowToRead,
 }: TopBarProps) {
   return (
     <div
@@ -111,9 +113,10 @@ export function TopBar({
           }}
         />
       </div>
-      {/* Education entry point — full tooltips/explainer land in Phase 6. */}
+      {/* Education entry point — opens the "How to read this board" panel. */}
       <button
         type="button"
+        onClick={onHowToRead}
         style={{
           display: "flex",
           alignItems: "center",
