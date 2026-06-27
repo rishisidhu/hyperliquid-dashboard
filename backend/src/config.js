@@ -70,10 +70,12 @@ export const config = {
   // Below this |%| change the trend reads "flat" (noise deadband).
   oiTrendDeadbandPct: floatEnv('OI_TREND_DEADBAND_PCT', 1.0),
 
-  // Minimum OI notional ($) for a market to count as "significant": headline
-  // eligibility floor (derive.js) and the shared Phase-7 board-density floor.
-  // Default $1M cleanly separates the illiquid micro-market tail.
+  // Board SIGNIFICANCE floor ($1M): "is this a real market?" Shared by the
+  // frontend hide-balanced filter (emitted in the board payload as oiFloorUsd).
   oiFloorUsd: floatEnv('OI_FLOOR_USD', 1_000_000),
+  // HEADLINE floor ($10M): higher, so marquee cards showcase liquid, credible
+  // crowding (ADA/TRUMP-class) rather than $2–4M froth (SPEC §12, Phase 7).
+  headlineOiFloorUsd: floatEnv('HEADLINE_OI_FLOOR_USD', 10_000_000),
 
   // --- Phase 5: cross-venue funding + funding-history sparklines ----------
   // Cross-venue poll cadence. Funding is hourly, so polling slowly is plenty
@@ -84,4 +86,8 @@ export const config = {
   fundingHistoryTtlMs: intEnv('FUNDING_HISTORY_TTL_MS', 300000),
   // How far back the sparkline reaches (hourly samples from Hyperliquid).
   fundingHistoryLookbackHours: intEnv('FUNDING_HISTORY_LOOKBACK_HOURS', 168),
+
+  // --- Phase 7: OI-cap flags ----------------------------------------------
+  // perpsAtOpenInterestCap poll cadence. The capped set changes slowly.
+  oiCapIntervalMs: intEnv('OI_CAP_INTERVAL_MS', 45000),
 };

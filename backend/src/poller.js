@@ -42,7 +42,11 @@ export class Poller {
     if (!this.running) return;
     try {
       const raw = await fetchMetaAndAssetCtxs();
-      const board = deriveBoard(raw, { oiFloorUsd: config.oiFloorUsd });
+      const board = deriveBoard(raw, {
+        oiFloorUsd: config.oiFloorUsd,
+        headlineFloorUsd: config.headlineOiFloorUsd,
+        cappedCoins: cache.cappedCoins,
+      });
       this.#enrichTrend(board);
       cache.set(board);
       this.backoffMs = 0; // recovered

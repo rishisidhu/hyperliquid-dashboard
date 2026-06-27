@@ -55,6 +55,15 @@ export async function fetchPredictedFundings() {
 }
 
 /**
+ * Coins currently at their open-interest cap (SPEC §4.2 OI-cap flag). Fixed
+ * body — no caller input. Returns the raw array of coin-name strings.
+ */
+export async function fetchPerpsAtOpenInterestCap() {
+  const data = await postInfo('{"type":"perpsAtOpenInterestCap"}');
+  return Array.isArray(data) ? data : [];
+}
+
+/**
  * Per-coin funding history since `startTime` (SPEC §4.4 sparkline).
  * SECURITY (§8.5): `coin` MUST already be validated against the universe by the
  * caller — this includes it in the upstream body. Returns the raw array (HL

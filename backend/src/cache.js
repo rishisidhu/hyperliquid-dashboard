@@ -15,6 +15,12 @@ class MarketCache extends EventEmitter {
     this.coinSet = new Set(); // valid coin names (universe allow-list, §8.5)
     this.predicted = null; // { byCoin } cross-venue map (Phase 5)
     this.predictedUpdatedAt = null;
+    this.cappedCoins = new Set(); // coins at their OI cap (Phase 7); read by the board poller
+  }
+
+  /** Update the OI-cap set (Phase 7). The next board build stamps rows from it. */
+  setCappedCoins(coins) {
+    this.cappedCoins = new Set(coins);
   }
 
   /** Store a fresh board and notify subscribers. */

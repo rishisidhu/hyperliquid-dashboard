@@ -76,11 +76,28 @@ test('deriveHeadlines (R1) ranks by |ann %| desc above the OI floor', () => {
     { coin: 'SH2', annualizedFundingPct: -53, oiNotional: 9e6, skew: { side: 'short' } },
     { coin: 'BAL', annualizedFundingPct: 1, oiNotional: 9e6, skew: { side: 'none' } }, // balanced
   ];
-  const { mostCrowdedLongs, mostCrowdedShorts } = deriveHeadlines(rows, { oiFloorUsd: 1e6 });
+  const { mostCrowdedLongs, mostCrowdedShorts } = deriveHeadlines(rows, {
+    headlineFloorUsd: 1e6,
+  });
   // TINY's extreme funding doesn't lead — it's below the floor (illiquid).
   assert.deepEqual(mostCrowdedLongs.map((r) => r.coin), ['HUGE', 'BIG']);
   // The fix: more-extreme short leads, regardless of OI ordering (SH1 -106 > SH2 -53).
   assert.deepEqual(mostCrowdedShorts.map((r) => r.coin), ['SH1', 'SH2']);
+});
+
+test('deriveHeadlines: headline floor ($10M) excludes liquid-but-not-flagship froth', () => {
+  const rows = [
+    { coin: 'FROTH', annualizedFundingPct: 449, oiNotional: 4.5e6, skew: { side: 'long' } }, // IP-like, > $1M but < $10M
+    { coin: 'ADA', annualizedFundingPct: -85, oiNotional: 28e6, skew: { side: 'short' } },
+    { coin: 'TRUMP', annualizedFundingPct: -73, oiNotional: 12e6, skew: { side: 'short' } },
+  ];
+  const { mostCrowdedLongs, mostCrowdedShorts } = deriveHeadlines(rows, {
+    headlineFloorUsd: 10e6,
+  });
+  // FROTH clears $1M but not the $10M headline floor — no long hero.
+  assert.deepEqual(mostCrowdedLongs.map((r) => r.coin), []);
+  // Liquid extremes lead, most-extreme first.
+  assert.deepEqual(mostCrowdedShorts.map((r) => r.coin), ['ADA', 'TRUMP']);
 });
 
 test('deriveHeadlines tiebreak: OI desc, then coin asc', () => {
@@ -89,23 +106,32 @@ test('deriveHeadlines tiebreak: OI desc, then coin asc', () => {
     { coin: 'AAA', annualizedFundingPct: 40, oiNotional: 2e6, skew: { side: 'long' } },
     { coin: 'CCC', annualizedFundingPct: 40, oiNotional: 5e6, skew: { side: 'long' } },
   ];
-  const { mostCrowdedLongs } = deriveHeadlines(rows, { oiFloorUsd: 1e6 });
+  const { mostCrowdedLongs } = deriveHeadlines(rows, { headlineFloorUsd: 1e6 });
   assert.deepEqual(mostCrowdedLongs.map((r) => r.coin), ['CCC', 'AAA', 'BBB']);
 });
 
-test('deriveBoard skips delisted and builds canonical headlines', () => {
+test('deriveBoard skips delisted, emits oiFloorUsd, stamps atOiCap', () => {
   const meta = {
     universe: [
       { name: 'BTC', maxLeverage: 40 },
+      { name: 'ETH', maxLeverage: 25 },
       { name: 'OLD', isDelisted: true },
     ],
   };
   const ctxs = [
-    { funding: '0.0001', openInterest: '100', markPx: '50000', prevDayPx: '40000' }, // OI $5M
+    { funding: '0.0001', openInterest: '300', markPx: '50000', prevDayPx: '40000' }, // OI $15M
+    { funding: '0.00005', openInterest: '10000', markPx: '2000', prevDayPx: '2000' }, // OI $20M
     { funding: '0.0001', openInterest: '1', markPx: '1', prevDayPx: '1' },
   ];
-  const board = deriveBoard({ meta, ctxs }); // default floor $1M
-  assert.equal(board.coinCount, 1);
-  assert.equal(board.rows[0].coin, 'BTC');
-  assert.equal(board.headlines.mostCrowdedLongs[0].coin, 'BTC');
+  const board = deriveBoard(
+    { meta, ctxs },
+    { oiFloorUsd: 1e6, headlineFloorUsd: 10e6, cappedCoins: new Set(['ETH']) },
+  );
+  assert.equal(board.coinCount, 2);
+  assert.equal(board.oiFloorUsd, 1e6); // emitted for the shared frontend floor
+  // atOiCap stamped from the capped set.
+  assert.equal(board.rows.find((r) => r.coin === 'ETH').atOiCap, true);
+  assert.equal(board.rows.find((r) => r.coin === 'BTC').atOiCap, false);
+  // Both clear the $10M headline floor.
+  assert.equal(board.headlines.mostCrowdedLongs[0].coin, 'BTC'); // 87.6% > 43.8%
 });

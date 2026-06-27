@@ -1,6 +1,7 @@
 // HTTP server — the localhost-only face of the backend (SPEC §6, §8.5).
 // nginx is the sole public door in production; this binds to 127.0.0.1.
-// Routes (GET only): /stream (SSE), /health, /funding-history?coin=NAME.
+// Routes (GET only): /stream (SSE), /board (one-shot snapshot / REST fallback),
+// /health, /funding-history?coin=NAME.
 //
 // Full §8.5 hardening lands in Phase 8. Seeded here: GET-only, strict origin
 // header, generic errors (no stack traces), no Server/version header.
@@ -51,6 +52,13 @@ export function createApp(sseHub, fundingHistory) {
         sseClients: sseHub.count,
         lastError: cache.lastError,
       });
+      return;
+    }
+
+    // One-shot current snapshot — the frontend's REST fallback when SSE is
+    // down (Phase 7). Same data as the stream's `message` frame.
+    if (path === '/board') {
+      sendJson(res, 200, cache.snapshot());
       return;
     }
 
