@@ -317,6 +317,26 @@ export function Board({
                       STALE {vm.staleAge}
                     </span>
                   )}
+                  {r.atOiCap && (
+                    <span
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        fontFamily: mono,
+                        fontSize: 9,
+                        letterSpacing: ".06em",
+                        color: "var(--stale)",
+                        border:
+                          "1px solid color-mix(in oklch, var(--stale), transparent 55%)",
+                        borderRadius: 3,
+                        padding: "0 4px",
+                      }}
+                    >
+                      🚫 AT CAP
+                      <InfoTip term="oiCap" stopPropagation />
+                    </span>
+                  )}
                 </div>
                 <span
                   style={{ fontFamily: mono, fontSize: 11, color: "var(--text-3)" }}

@@ -33,6 +33,10 @@ export const GLOSSARY = {
     term: "OI trend",
     body: "Whether open interest is rising or unwinding versus about 20 minutes ago — the crowd adding to positions, or closing them out.",
   },
+  oiCap: {
+    term: "At open-interest cap",
+    body: "This market has hit Hyperliquid's open-interest limit — no new positions can be opened until the cap is raised or open interest falls.",
+  },
   change24h: {
     term: "24h change",
     body: "Price change over the last 24 hours. Shown in one neutral colour with ▲/▽ — direction only, not a judgement.",
