@@ -83,6 +83,8 @@ export default function Page() {
               staleAge={staleAge}
               marketCount={board.coinCount}
               predicted={predicted}
+              searching={query.trim().length > 0}
+              oiFloorUsd={board.oiFloorUsd}
             />
           </>
         ) : (

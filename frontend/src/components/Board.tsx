@@ -4,6 +4,9 @@ import { Fragment, useMemo, useState } from "react";
 import type { BoardRow, PredictedFundings } from "@/lib/types";
 import type { GlossaryKey } from "@/lib/glossary";
 import { rowVM } from "@/lib/viewModel";
+import { selectTopN, applyHideBalanced } from "@/lib/density.mjs";
+
+type TopN = 10 | 25 | 50 | "all";
 import { Pips } from "./Pips";
 import { RowDetail } from "./RowDetail";
 import { InfoTip } from "./InfoTip";
@@ -75,17 +78,40 @@ interface BoardProps {
   staleAge: string;
   marketCount: number;
   predicted: PredictedFundings | null;
+  // True when a search filter is active — search escapes the Top-N limit.
+  searching: boolean;
+  // Shared significance floor from the backend payload (hide-balanced).
+  oiFloorUsd: number;
 }
 
-export function Board({ rows, stale, staleAge, marketCount, predicted }: BoardProps) {
+const TOP_N_OPTIONS: TopN[] = [10, 25, 50, "all"];
+
+export function Board({
+  rows,
+  stale,
+  staleAge,
+  marketCount,
+  predicted,
+  searching,
+  oiFloorUsd,
+}: BoardProps) {
   const [sortKey, setSortKey] = useState<SortKey>("intensity");
   const [dir, setDir] = useState<Dir>("desc");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [topN, setTopN] = useState<TopN>(25);
+  const [hideBalanced, setHideBalanced] = useState(false);
+
+  // Pipeline: hide-balanced filter → Top-N density (skipped while searching) →
+  // sort by the active column. Search escapes the limit so any market is findable.
+  const visible = useMemo(() => {
+    const filtered = applyHideBalanced(rows, hideBalanced, oiFloorUsd);
+    return searching ? filtered : selectTopN(filtered, topN);
+  }, [rows, hideBalanced, oiFloorUsd, searching, topN]);
 
   const sorted = useMemo(() => {
     const acc = accessors[sortKey];
-    return [...rows].sort((x, y) => compare(acc(x), acc(y), dir));
-  }, [rows, sortKey, dir]);
+    return [...visible].sort((x, y) => compare(acc(x), acc(y), dir));
+  }, [visible, sortKey, dir]);
 
   function onSort(col: Column) {
     if (col.key === sortKey) {
@@ -111,13 +137,67 @@ export function Board({ rows, stale, staleAge, marketCount, predicted }: BoardPr
             Board
           </span>
           <span style={{ fontSize: 11.5, color: "var(--text-3)" }}>
-            {marketCount} markets · sorted by{" "}
-            {COLUMNS.find((c) => c.key === sortKey)?.label.toLowerCase()}
+            {searching
+              ? `${sorted.length} of ${marketCount} markets · search`
+              : `showing ${sorted.length} of ${marketCount} markets`}
           </span>
         </div>
-        <span style={{ fontSize: 11, color: "var(--text-4)", fontFamily: mono }}>
-          click any column to sort
-        </span>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          {/* hide-balanced — opt-in; keeps big balanced markets via the OI floor */}
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 11.5,
+              color: "var(--text-3)",
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={hideBalanced}
+              onChange={(e) => setHideBalanced(e.target.checked)}
+              style={{ accentColor: "var(--long)", cursor: "pointer" }}
+            />
+            Hide balanced
+          </label>
+
+          {/* Top-N selector; "All" always available */}
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span style={{ fontSize: 11, color: "var(--text-4)" }}>Show</span>
+            {TOP_N_OPTIONS.map((n) => {
+              const on = topN === n;
+              return (
+                <button
+                  key={String(n)}
+                  type="button"
+                  onClick={() => setTopN(n)}
+                  disabled={searching}
+                  aria-pressed={on}
+                  style={{
+                    padding: "2px 8px",
+                    fontSize: 11,
+                    fontFamily: mono,
+                    border: `1px solid ${on ? "var(--border-strong)" : "var(--border)"}`,
+                    borderRadius: 5,
+                    background: on ? "var(--surface-3)" : "transparent",
+                    color: searching
+                      ? "var(--text-4)"
+                      : on
+                        ? "var(--text-1)"
+                        : "var(--text-3)",
+                    cursor: searching ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {n === "all" ? "All" : n}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <div

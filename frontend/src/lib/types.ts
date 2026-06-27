@@ -34,6 +34,8 @@ export interface BoardRow {
   oraclePx: number | null;
   midPx: number | null;
   oiTrend: OiTrend | null;
+  // At its open-interest cap — no new positions can be opened (Phase 7).
+  atOiCap?: boolean;
 }
 
 export interface Board {
@@ -43,6 +45,8 @@ export interface Board {
     mostCrowdedShorts: BoardRow[];
   };
   coinCount: number;
+  // Shared significance floor ($) — frontend reads it for hide-balanced.
+  oiFloorUsd: number;
 }
 
 export interface Snapshot {
