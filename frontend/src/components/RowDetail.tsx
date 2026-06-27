@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { FundingHistoryResponse, PredictedVenue } from "@/lib/types";
 import { getFundingHistory } from "@/lib/fundingHistory";
 import { Sparkline } from "./Sparkline";
+import { InfoTip } from "./InfoTip";
 
 const mono = "var(--font-num)";
 
@@ -91,7 +92,11 @@ export function RowDetail({ coin, venues }: RowDetailProps) {
     >
       {/* Cross-venue funding — descriptive only: numbers + next funding times. */}
       <div>
-        <div style={label}>Annualized funding by venue</div>
+        <div style={label}>
+          Annualized funding by venue
+          <InfoTip term="crossVenue" />
+          <InfoTip term="fundingInterval" />
+        </div>
         {venues && venues.length > 0 ? (
           venues.map((v) => <VenueRow key={v.code} v={v} now={now} />)
         ) : (
@@ -101,7 +106,10 @@ export function RowDetail({ coin, venues }: RowDetailProps) {
 
       {/* Funding history sparkline */}
       <div>
-        <div style={label}>Funding history · annualized</div>
+        <div style={label}>
+          Funding history · annualized
+          <InfoTip term="annualized" />
+        </div>
         {error ? (
           <span style={muted}>History unavailable right now.</span>
         ) : history ? (

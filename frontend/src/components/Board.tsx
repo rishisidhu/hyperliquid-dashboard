@@ -2,9 +2,11 @@
 
 import { Fragment, useMemo, useState } from "react";
 import type { BoardRow, PredictedFundings } from "@/lib/types";
+import type { GlossaryKey } from "@/lib/glossary";
 import { rowVM } from "@/lib/viewModel";
 import { Pips } from "./Pips";
 import { RowDetail } from "./RowDetail";
+import { InfoTip } from "./InfoTip";
 
 const mono = "var(--font-num)";
 
@@ -34,16 +36,17 @@ interface Column {
   label: string;
   align: "left" | "right";
   defaultDir: Dir;
+  term?: GlossaryKey; // attaches a tooltip to the header
 }
 
 const COLUMNS: Column[] = [
   { key: "coin", label: "Market", align: "left", defaultDir: "asc" },
-  { key: "intensity", label: "Crowd skew", align: "left", defaultDir: "desc" },
-  { key: "funding", label: "Funding ann.", align: "right", defaultDir: "desc" },
-  { key: "oi", label: "Open int.", align: "right", defaultDir: "desc" },
-  { key: "chg", label: "24h", align: "right", defaultDir: "desc" },
-  { key: "vol", label: "24h vol", align: "right", defaultDir: "desc" },
-  { key: "trend", label: "OI trend", align: "left", defaultDir: "desc" },
+  { key: "intensity", label: "Crowd skew", align: "left", defaultDir: "desc", term: "crowdSkew" },
+  { key: "funding", label: "Funding ann.", align: "right", defaultDir: "desc", term: "funding" },
+  { key: "oi", label: "Open int.", align: "right", defaultDir: "desc", term: "openInterest" },
+  { key: "chg", label: "24h", align: "right", defaultDir: "desc", term: "change24h" },
+  { key: "vol", label: "24h vol", align: "right", defaultDir: "desc", term: "volume24h" },
+  { key: "trend", label: "OI trend", align: "left", defaultDir: "desc", term: "oiTrend" },
 ];
 
 function compare(
@@ -160,6 +163,7 @@ export function Board({ rows, stale, staleAge, marketCount, predicted }: BoardPr
                 }}
               >
                 {col.label}
+                {col.term && <InfoTip term={col.term} stopPropagation />}
                 <span style={{ color: "var(--text-2)", fontSize: 9 }}>
                   {active ? (dir === "desc" ? "▼" : "▲") : ""}
                 </span>
