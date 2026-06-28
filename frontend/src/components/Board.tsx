@@ -95,6 +95,11 @@ export function Board({
   searching,
   oiFloorUsd,
 }: BoardProps) {
+  // Default sort is crowd-intensity DESC by deliberate product choice: the
+  // thesis is "where is the crowd", so the board leads with the most stretched
+  // markets, not the biggest. A market selected into the curated set because
+  // it's extremely crowded therefore appears near the top ("why is this here"
+  // is obvious). All columns (incl. OI) remain available as click-to-sort.
   const [sortKey, setSortKey] = useState<SortKey>("intensity");
   const [dir, setDir] = useState<Dir>("desc");
   const [expanded, setExpanded] = useState<string | null>(null);
