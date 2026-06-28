@@ -34,9 +34,32 @@ test("selectTopN fills remaining slots by intensity", () => {
   assert.equal(top.length, 2);
 });
 
-test('selectTopN "all" returns everything', () => {
+test("selectTopN floor excludes sub-$1M micro-caps from the curated fill", () => {
+  const rows = [
+    row("ETH", 1e9, "none", 0), // big, real
+    row("IP", 4.4e6, "long", 0.95), // above floor — stays
+    row("ZORA", 538_000, "short", 0.99), // sub-floor extreme — must NOT appear
+    row("SNX", 634_000, "short", 0.98), // sub-floor extreme — must NOT appear
+  ];
+  const top = selectTopN(rows, 10, 1_000_000);
+  const coins = top.map((r) => r.coin).sort();
+  assert.deepEqual(coins, ["ETH", "IP"]); // only real markets, via OI guarantee + intensity fill
+});
+
+test('selectTopN "all" is exempt from the floor (shows sub-$1M)', () => {
+  const rows = [
+    row("ETH", 1e9, "none", 0),
+    row("ZORA", 538_000, "short", 0.99),
+  ];
+  const all = selectTopN(rows, "all", 1_000_000);
+  assert.equal(all.length, 2); // ZORA still present under "All"
+  assert.ok(all.some((r) => r.coin === "ZORA"));
+});
+
+test("selectTopN with no floor (0) keeps prior behavior", () => {
   const rows = [row("A", 1, "long"), row("B", 2, "short")];
   assert.equal(selectTopN(rows, "all").length, 2);
+  assert.equal(selectTopN(rows, 10, 0).length, 2); // tiny markets kept when floor disabled
 });
 
 test("selectTopN never duplicates a market that's both big and crowded", () => {

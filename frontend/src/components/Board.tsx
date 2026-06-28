@@ -105,7 +105,9 @@ export function Board({
   // sort by the active column. Search escapes the limit so any market is findable.
   const visible = useMemo(() => {
     const filtered = applyHideBalanced(rows, hideBalanced, oiFloorUsd);
-    return searching ? filtered : selectTopN(filtered, topN);
+    // Curated Top-N is "real markets only" (≥ floor); search bypasses selectTopN
+    // and "All" is exempt inside it, so sub-floor coins stay reachable.
+    return searching ? filtered : selectTopN(filtered, topN, oiFloorUsd);
   }, [rows, hideBalanced, oiFloorUsd, searching, topN]);
 
   const sorted = useMemo(() => {

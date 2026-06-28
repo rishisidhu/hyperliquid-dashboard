@@ -41,19 +41,32 @@ export function applyHideBalanced(rows, hideBalanced, oiFloorUsd) {
 }
 
 /**
- * Select the visible set for a Top-N view. "all" returns everything.
- * Guarantee top-OI markets, then fill by intensity. Order here is not final —
- * the caller re-sorts by the active column.
+ * Select the visible set for a curated Top-N view. "all" returns everything
+ * (complete-market credibility — exempt from the floor).
+ *
+ * For a numeric N, the candidate pool is first filtered to "real markets"
+ * (OI ≥ oiFloorUsd) so the curated board NEVER pulls in a sub-floor micro-cap —
+ * not via the top-OI guarantee, and not via the intensity-fill path. Then:
+ * guarantee top-OI markets, fill the rest by intensity, dedup. The $1M floor
+ * thus consistently means "is this a real market?" for the curated view.
+ *
+ * NOTE: search bypasses this entirely (the caller skips selectTopN while
+ * searching), so any coin — including sub-floor ones — stays findable.
+ *
  * @param {BoardRow[]} rows
  * @param {TopN} topN
+ * @param {number} [oiFloorUsd] significance floor for the curated view (0 = none)
  * @returns {BoardRow[]}
  */
-export function selectTopN(rows, topN) {
-  if (topN === "all" || rows.length <= topN) return rows;
+export function selectTopN(rows, topN, oiFloorUsd = 0) {
+  if (topN === "all") return rows; // All: unfiltered, shows sub-floor markets too
+
+  const eligible = oiFloorUsd > 0 ? rows.filter((r) => oiOf(r) >= oiFloorUsd) : rows;
+  if (eligible.length <= topN) return eligible;
 
   const guaranteeCount = Math.ceil(topN * OI_GUARANTEE_FRAC);
-  const topByOi = [...rows].sort((a, b) => oiOf(b) - oiOf(a)).slice(0, guaranteeCount);
-  const byIntensity = [...rows].sort((a, b) => intensityOf(b) - intensityOf(a));
+  const topByOi = [...eligible].sort((a, b) => oiOf(b) - oiOf(a)).slice(0, guaranteeCount);
+  const byIntensity = [...eligible].sort((a, b) => intensityOf(b) - intensityOf(a));
 
   /** @type {BoardRow[]} */
   const picked = [];
@@ -65,7 +78,7 @@ export function selectTopN(rows, topN) {
       picked.push(r);
     }
   };
-  topByOi.forEach(take); // biggest markets always present
-  byIntensity.forEach(take); // then the most crowded
+  topByOi.forEach(take); // biggest real markets always present
+  byIntensity.forEach(take); // then the most crowded real markets
   return picked;
 }
