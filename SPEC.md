@@ -358,12 +358,32 @@ Base URL: `https://api.hyperliquid.xyz`
   - ***Virtualization deferral — explicit trigger:*** *render all rows plainly. Add windowing ONLY if the "All" view (~230 rows @ 2s updates) visibly janks (dropped frames / input lag on scroll). Not observed; not implemented. (The default Top-25 means most sessions render ≤25 rows anyway.)*
   - ***Tests/deps:*** *`density.mjs` authored with JSDoc types (not `.ts`) so it unit-tests directly under `node --test` with **zero new deps** (the app imports it fully typed via `allowJs`+JSDoc). Backend 29 tests, frontend 5 density tests, all green; `next build` green. Visual confirmation of the new controls/badge deferred to the operator's browser (headless screenshot hangs on the open SSE stream, as in Phases 4–6).*
 
-### Phase 7.5 — Theming (light mode)
-- ⬜ Light-palette counterpart for the existing CSS-variable tokens under a theme selector (`data-theme` and/or `prefers-color-scheme`)
-- ⬜ Theme toggle, persisted in-session
-- ⬜ Re-tuned OKLCH lightness for the skew ramp so teal/amber stay legible + colorblind-safe on a light background
+### Phase 7.5 — Theming (light mode) + dark contrast pass
+- ✅ Dark contrast & depth re-tune (keep terminal identity; fix flat/depressing)
+- ✅ Light-palette counterpart under `:root[data-theme="light"]` (dark = default)
+- ✅ Theme toggle, persisted in localStorage; pre-paint script (no flash)
+- ✅ Re-tuned OKLCH skew ramp for light (legible + colourblind-safe on white)
 - *Notes:*
   - *2026-06-24 — Sequenced after Phase 7 polish, before Phase 9 deploy. Cheap because the frontend already references CSS-variable tokens (not hardcoded colors), so a second palette is mostly a token-set swap — the only real work is re-tuning the OKLCH skew ramp for light backgrounds.*
+  - *2026-06-29 — Two separate commits: dark contrast pass, then light mode.*
+  - ***Dark contrast & depth pass (token deltas).*** *Panels were melting into the bg. Bigger elevation steps + faint cool slate tint + stronger borders + brighter mid text. Accent discipline kept (teal/amber reserved for data; no brand accent in the chrome). Headline cards got a restrained accent-edge glow. Before → after:*
+    - *`--bg` `#08090b` → `#0a0c12` · `--surface-1` `#0d0f13` → `#12151e` · `--surface-2` `#13161c` → `#1a1f2b` · `--surface-3` `#1a1e25` → `#232a38`*
+    - *`--border` `#1e222a` → `#2a3140` · `--border-strong` `#2b313b` → `#3a4456`*
+    - *`--text-1` `#e9ecf1` → `#eceff4` · `--text-2` `#a6aebb` → `#b2bac7` · `--text-3` `#6b7480` → `#79818f` · `--text-4` `#454c56` → `#4c5462`*
+    - *`--balanced` `#5a626d` → `#626b78` · `--pip-off` `#262b34` → `#2c3340` · `--flat` → `#79818f`. Meaning hues (long/short/rising/unwinding/stale) unchanged — re-checked, they still pop on the lifted surfaces.*
+  - ***Light mode.*** *`:root[data-theme="light"]` overrides the same token names (white cards on a soft cool-grey page, near-black text, darkened meaning hues). Dark is the default with or without the attribute. `useTheme` persists to localStorage; a pre-paint inline script in `layout.tsx` sets `data-theme` before hydration (`suppressHydrationWarning` on `<html>`) so CSS tokens are correct on the first frame. Sun/moon toggle in the top bar. Default theme is DARK (not `prefers-color-scheme`) — terminal aesthetic is the brand; light is opt-in.*
+  - ***Light skew ramp (re-tuned, theme-aware `skewColor`).*** *The continuous pip ramp can't live in CSS, so `skewColor` takes a `theme`: dark climbs lightness with intensity; light FALLS in lightness while chroma climbs (darker + more saturated = more extreme on white). Hues unchanged (teal 195 / amber 70). Sample mapping (intensity t via the log scale):*
+
+    | ann% | t | long (light) | short (light) |
+    |---|---|---|---|
+    | 10% | 0.140 | `oklch(0.632 0.074 195)` | `oklch(0.672 0.084 70)` |
+    | 30% | 0.363 | `oklch(0.587 0.096 195)` | `oklch(0.627 0.106 70)` |
+    | 50% | 0.466 | `oklch(0.567 0.107 195)` | `oklch(0.607 0.117 70)` |
+    | 100% | 0.606 | `oklch(0.539 0.121 195)` | `oklch(0.579 0.131 70)` |
+    | 300% | 0.829 | `oklch(0.494 0.143 195)` | `oklch(0.534 0.153 70)` |
+    | 700% | 1.000 | `oklch(0.460 0.160 195)` | `oklch(0.500 0.170 70)` |
+
+  - ***Verification:*** *`next build` green; 29 backend + 7 FE tests pass. `theme` threaded through `rowVM`/`hlItem`; all `pips()`/`skewColor()` call sites updated. Visual confirmation of both themes deferred to the operator's browser (headless screenshot still hangs on the open SSE stream).*
 
 ### Phase 8 — Security hardening (§8.5)
 - ⬜ Node bound to 127.0.0.1 only; nginx sole public door
