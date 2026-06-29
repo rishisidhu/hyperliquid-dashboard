@@ -106,6 +106,10 @@ body {
 .board-row:hover {
   background: var(--surface-2);
 }
+/* expand affordance: leading chevron brightens on row hover */
+.board-row:hover .row-chevron {
+  color: var(--text-2);
+}
 
 /* live dot (top bar) */
 @keyframes pulse {
@@ -137,5 +141,6 @@ body {
   *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
   }
 }

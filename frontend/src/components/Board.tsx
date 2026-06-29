@@ -272,6 +272,7 @@ export function Board({
               onClick={() => setExpanded(isOpen ? null : r.coin)}
               role="button"
               aria-expanded={isOpen}
+              title={isOpen ? "Collapse" : "Expand — cross-venue funding & history"}
               style={{
                 display: "grid",
                 gridTemplateColumns: "var(--board-cols)",
@@ -285,15 +286,30 @@ export function Board({
                 background: isOpen ? "var(--surface-2)" : undefined,
               }}
             >
-              {/* market */}
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 2,
-                  minWidth: 0,
-                }}
-              >
+              {/* market — leading chevron signals the row opens */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                <span
+                  className="row-chevron"
+                  aria-hidden="true"
+                  style={{
+                    flex: "none",
+                    color: "var(--text-4)",
+                    fontSize: 11,
+                    lineHeight: 1,
+                    transition: "transform .15s ease, color .15s ease",
+                    transform: isOpen ? "rotate(90deg)" : "none",
+                  }}
+                >
+                  ›
+                </span>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                    minWidth: 0,
+                  }}
+                >
                 <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                   <span style={{ fontWeight: 600, fontSize: 13.5 }}>{vm.coin}</span>
                   {vm.lev && (
@@ -352,6 +368,7 @@ export function Board({
                 >
                   {vm.price}
                 </span>
+                </div>
               </div>
 
               {/* crowd skew */}
