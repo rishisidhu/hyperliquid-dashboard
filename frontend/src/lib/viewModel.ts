@@ -6,7 +6,7 @@
 //   2. Null-safe: the live feed can carry null numerics (e.g. before a field is
 //      known); the mockup's fixtures never did. Missing numbers render as "—".
 
-import type { BoardRow, OiTrend } from "./types";
+import type { BoardRow, OiTrend, Theme } from "./types";
 import { pips, type Pip } from "./tokens";
 import { usd, pct, price } from "./format";
 
@@ -69,7 +69,12 @@ export interface RowVM {
   dim: number;
 }
 
-export function rowVM(r: BoardRow, stale: boolean, staleAge: string): RowVM {
+export function rowVM(
+  r: BoardRow,
+  stale: boolean,
+  staleAge: string,
+  theme: Theme = "dark",
+): RowVM {
   const s = r.skew;
   const bal = s.side === "none";
   const skewTextCol = bal
@@ -87,7 +92,7 @@ export function rowVM(r: BoardRow, stale: boolean, staleAge: string): RowVM {
     notBalanced: !bal,
     label: s.label,
     skewTextColor: skewTextCol,
-    pips: pips(s.side, s.intensity),
+    pips: pips(s.side, s.intensity, theme),
     funding: fmt(fundingNum, pct),
     fundingColor:
       fundingNum != null && fundingNum > 0
@@ -125,13 +130,13 @@ export interface HeadlineItem {
   intensity: number;
 }
 
-export function hlItem(r: BoardRow): HeadlineItem {
+export function hlItem(r: BoardRow, theme: Theme = "dark"): HeadlineItem {
   return {
     coin: r.coin,
     lev: r.maxLeverage != null ? r.maxLeverage + "×" : "",
     label: r.skew.label,
     funding: fmt(r.annualizedFundingPct, pct),
-    pips: pips(r.skew.side, r.skew.intensity),
+    pips: pips(r.skew.side, r.skew.intensity, theme),
     intensity: r.skew.intensity,
   };
 }

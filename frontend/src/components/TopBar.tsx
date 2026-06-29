@@ -1,5 +1,7 @@
 "use client";
 
+import type { Theme } from "@/lib/types";
+
 interface TopBarProps {
   connected: boolean;
   stale: boolean; // backend serving last-known during an upstream blip
@@ -8,6 +10,8 @@ interface TopBarProps {
   query: string;
   onQuery: (q: string) => void;
   onHowToRead: () => void;
+  theme: Theme;
+  onToggleTheme: () => void;
 }
 
 const mono = "var(--font-num)";
@@ -20,6 +24,8 @@ export function TopBar({
   query,
   onQuery,
   onHowToRead,
+  theme,
+  onToggleTheme,
 }: TopBarProps) {
   // Three states: reconnecting (stream down) · stale (connected but upstream
   // blip, serving last-known) · live (connected + fresh).
@@ -137,6 +143,29 @@ export function TopBar({
       >
         <span style={{ opacity: 0.7 }}>?</span>
         <span>How to read this board</span>
+      </button>
+      {/* Theme toggle — dark is default; light is opt-in (persisted). */}
+      <button
+        type="button"
+        onClick={onToggleTheme}
+        aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+        title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 30,
+          height: 30,
+          background: "var(--surface-1)",
+          border: "1px solid var(--border)",
+          borderRadius: 6,
+          color: "var(--text-2)",
+          fontSize: 13,
+          cursor: "pointer",
+          fontFamily: "var(--font-ui)",
+        }}
+      >
+        {theme === "dark" ? "☀" : "☾"}
       </button>
     </div>
   );

@@ -24,9 +24,20 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Set the theme before paint so CSS tokens are correct on the first frame
+  // (no flash). Dark is the default; a stored light choice is honoured.
+  const themeScript = `try{var t=localStorage.getItem('theme');document.documentElement.dataset.theme=(t==='light'||t==='dark')?t:'dark'}catch(e){document.documentElement.dataset.theme='dark'}`;
+
   return (
-    <html lang="en" className={`${geist.variable} ${jetbrainsMono.variable}`}>
-      <body>{children}</body>
+    <html
+      lang="en"
+      className={`${geist.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
+    >
+      <body>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {children}
+      </body>
     </html>
   );
 }

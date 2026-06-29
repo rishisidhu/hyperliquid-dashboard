@@ -40,6 +40,37 @@
   --font-num: var(--font-mono), "JetBrains Mono", ui-monospace, monospace;
 }
 
+/* Light theme — opt-in (dark is the default with or without the attribute).
+   Same token NAMES; only values change, so every component themes for free.
+   Meaning hues stay teal 195 / amber 70 (colourblind-safe), darkened for
+   legibility on light surfaces. The continuous skew pip ramp is re-tuned in
+   tokens.ts (skewColor: lightness falls as intensity rises on light). */
+:root[data-theme="light"] {
+  /* base & surfaces — white cards on a soft cool-grey page */
+  --bg: #f4f6f9;
+  --surface-1: #ffffff;
+  --surface-2: #eceff3;
+  --surface-3: #e2e6ec;
+  --border: #d5dae2;
+  --border-strong: #b7bfca;
+  /* text tiers — near-black down to a mid grey, AA on the surfaces above */
+  --text-1: #0f1319;
+  --text-2: #3c4655;
+  --text-3: #616b78;
+  --text-4: #8b94a1;
+  /* meaning — darkened so they read on white */
+  --long: oklch(0.52 0.13 195);
+  --long-dim: oklch(0.72 0.06 195);
+  --short: oklch(0.58 0.14 70);
+  --short-dim: oklch(0.74 0.07 70);
+  --balanced: #8b94a1;
+  --rising: oklch(0.52 0.12 155);
+  --unwinding: oklch(0.48 0.1 285);
+  --flat: #616b78;
+  --stale: oklch(0.55 0.13 65);
+  --pip-off: #d5dae2;
+}
+
 * {
   box-sizing: border-box;
 }

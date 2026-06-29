@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useStream, useNow } from "@/lib/useStream";
+import { useTheme } from "@/lib/useTheme";
 import { hlItem, interp } from "@/lib/viewModel";
 import { TopBar } from "@/components/TopBar";
 import { HeadlineStrip } from "@/components/HeadlineStrip";
@@ -24,6 +25,7 @@ function staleAgeStr(ms: number, fromMs: number | null): string {
 
 export default function Page() {
   const { snapshot, predicted, connected } = useStream();
+  const { theme, toggle: toggleTheme } = useTheme();
   const now = useNow(1000);
   const [query, setQuery] = useState("");
   const [howToOpen, setHowToOpen] = useState(false);
@@ -45,13 +47,13 @@ export default function Page() {
 
   // interp's superlative fires only for the rank-1 (top) item (isTop = true).
   const longTop = longs[0]
-    ? { ...hlItem(longs[0]), interp: interp(longs[0], true) }
+    ? { ...hlItem(longs[0], theme), interp: interp(longs[0], true) }
     : null;
   const shortTop = shorts[0]
-    ? { ...hlItem(shorts[0]), interp: interp(shorts[0], true) }
+    ? { ...hlItem(shorts[0], theme), interp: interp(shorts[0], true) }
     : null;
-  const longRest = longs.slice(1, 3).map(hlItem);
-  const shortRest = shorts.slice(1, 3).map(hlItem);
+  const longRest = longs.slice(1, 3).map((r) => hlItem(r, theme));
+  const shortRest = shorts.slice(1, 3).map((r) => hlItem(r, theme));
 
   const updatedAgo = ago(now, snapshot?.updatedAt ?? null);
   const staleAge = staleAgeStr(now, snapshot?.updatedAt ?? null);
@@ -66,6 +68,8 @@ export default function Page() {
         query={query}
         onQuery={setQuery}
         onHowToRead={() => setHowToOpen(true)}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
       <HowToReadPanel open={howToOpen} onClose={() => setHowToOpen(false)} />
 
@@ -86,6 +90,7 @@ export default function Page() {
               predicted={predicted}
               searching={query.trim().length > 0}
               oiFloorUsd={board.oiFloorUsd}
+              theme={theme}
             />
           </>
         ) : (

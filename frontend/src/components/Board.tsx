@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import type { BoardRow, PredictedFundings } from "@/lib/types";
+import type { BoardRow, PredictedFundings, Theme } from "@/lib/types";
 import type { GlossaryKey } from "@/lib/glossary";
 import { rowVM } from "@/lib/viewModel";
 import { selectTopN, applyHideBalanced } from "@/lib/density.mjs";
@@ -82,6 +82,7 @@ interface BoardProps {
   searching: boolean;
   // Shared significance floor from the backend payload (hide-balanced).
   oiFloorUsd: number;
+  theme: Theme;
 }
 
 const TOP_N_OPTIONS: TopN[] = [10, 25, 50, "all"];
@@ -94,6 +95,7 @@ export function Board({
   predicted,
   searching,
   oiFloorUsd,
+  theme,
 }: BoardProps) {
   // Default sort is crowd-intensity DESC by deliberate product choice: the
   // thesis is "where is the crowd", so the board leads with the most stretched
@@ -261,7 +263,7 @@ export function Board({
 
         {/* rows */}
         {sorted.map((r) => {
-          const vm = rowVM(r, stale, staleAge);
+          const vm = rowVM(r, stale, staleAge, theme);
           const isOpen = expanded === r.coin;
           return (
             <Fragment key={r.coin}>

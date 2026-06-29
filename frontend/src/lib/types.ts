@@ -3,6 +3,8 @@
 
 export type SkewSide = "long" | "short" | "none";
 
+export type Theme = "dark" | "light";
+
 export interface Skew {
   label: string; // "Longs crowded" | "Shorts crowded" | "Balanced" | "Unknown"
   side: SkewSide;
