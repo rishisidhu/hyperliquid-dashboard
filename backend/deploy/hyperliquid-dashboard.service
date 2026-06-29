@@ -16,7 +16,7 @@ Type=simple
 User=hldash
 Group=hldash
 WorkingDirectory=/opt/hldash/backend
-# Adjust if `which node` differs on the box (e.g. nodesource installs /usr/bin/node).
+# Node 20 installed system-wide via NodeSource at /usr/bin/node (confirmed on the box).
 ExecStart=/usr/bin/node src/index.js
 Restart=on-failure
 RestartSec=3
@@ -48,7 +48,9 @@ ProtectControlGroups=true
 RestrictSUIDSGID=true
 RestrictNamespaces=true
 LockPersonality=true
-MemoryDenyWriteExecute=true
+# Must stay false: Node's V8 JIT needs writable+executable memory; =true
+# crashes the process with a core dump on startup. (Matches the deployed box.)
+MemoryDenyWriteExecute=false
 RestrictAddressFamilies=AF_INET AF_INET6
 # ProtectSystem=strict makes the whole FS read-only except this writable path
 # (the SQLite file + its WAL/SHM live here, owned by the service user).
