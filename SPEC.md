@@ -387,13 +387,18 @@ Base URL: `https://api.hyperliquid.xyz`
   - ***Verification:*** *`next build` green; 29 backend + 7 FE tests pass. `theme` threaded through `rowVM`/`hlItem`; all `pips()`/`skewColor()` call sites updated. Visual confirmation of both themes deferred to the operator's browser (headless screenshot still hangs on the open SSE stream).*
 
 ### Phase 7.6 — Live depth & discoverability
-- 🟡 Light-mode header-bug fix + token-leak cleanup (completes 7.5)
-- ⬜ Row-expand affordance (chevron + hover hint)
-- ⬜ Live "heartbeat" chart (top-5-by-OI signed funding, animated per snapshot)
-- ⬜ OI/price quadrant regime scatter (animated drift; warming cold-start)
+- ✅ Light-mode header-bug fix + token-leak cleanup (completes 7.5)
+- ✅ Row-expand affordance (chevron + hover cue)
+- ✅ Live "heartbeat" chart (top-5-by-OI signed funding, animated per snapshot)
+- ✅ OI/price quadrant regime scatter (animated drift; warming cold-start)
 - *Notes:*
   - ***Sequencing rationale (2026-06-29).*** *Roadmap order changed: feature work (this phase) is inserted BEFORE Phase 8 (security hardening) and Phase 9 (deploy), which stay last. Reason: the §8.5 hardening audit and the cutover must run against the FINAL feature set — if we hardened/deployed first, later feature changes (new components, new client behaviour) would invalidate the audit and the deploy. Hardening + deploy always go last. (Phase 7.6 is frontend-only and adds NO server endpoint — it reuses the existing SSE stream — so it doesn't expand the eventual hardening surface.)*
   - ***Header bug + token leaks.*** *The sticky header used a hardcoded `rgba(8,9,11,.92)` (dark `--bg`), so in light mode it stayed dark-on-dark. Migrated to a themed `--header-bg` (a `color-mix` of `--bg` that auto-tracks the theme). Grep also found the modal scrim and two elevation box-shadows hardcoded — tokenized as `--scrim` and `--shadow-color` (per-theme). No hardcoded colours remain in components.*
+  - ***Expand affordance.*** *Quiet leading chevron in the Market cell that rotates 90° when open (CSS transition), brightens on row hover, plus a native `title` ("Expand — cross-venue funding & history"). Reduced-motion now also neutralizes transitions.*
+  - ***Heartbeat chart.*** *`useHeartbeat` keeps a rolling ~2min client-side window of signed annualized funding for every coin (fed by each 2s snapshot — no new endpoint) and exposes the current top-5 by OI. `Heartbeat` is an inline-SVG multi-line chart (zero baseline; lines coloured by current lean teal/amber) redrawn per snapshot (~30×/min). Continuous "alive" feel = a GPU-composited CSS-pulsing leading dot, NOT per-frame JS (no rAF, no charting lib). Metric is signed funding % (lean direction + cost; the +/− flip is the interesting movement). Warming state until ≥2 samples.*
+  - ***Regime scatter.*** *`Quadrant` plots significant markets (≥$1M, `oiTrend.state==='ok'`, ~40 cap) by 24h price change × OI-trend → four plain-language regimes (new longs / short squeeze / long unwind / new shorts), descriptive labels only (no advice). Dots drift each tick via a GPU-composited `transform` transition; **container-query units (`cqw`)** keep X responsive without `preserveAspectRatio` distorting the round dots. **Cold-start handled:** when no coin has OI history yet (fresh backend), shows "Warming up — building history…" rather than an empty plot, same principle as the OI-trend column; fills in as history accrues. Reuses existing row data.*
+  - ***Layout.*** *Two-up "live band" (`Heartbeat | Quadrant`) between the headline strip and the board; stacks to one column ≤760px. Preserves the one-screen wedge: static story → live pulse → detailed board.*
+  - ***Discipline/verification.*** *Tokens-only (no new hardcoded colours), colourblind-safe (teal/amber + position + labels), **zero new deps** (inline SVG + CSS), reduced-motion disables pulse/drift. Backend untouched; no new endpoint (hardening surface unchanged). `next build` green; 29 backend + 7 FE tests pass. Visual review in-browser by the operator (headless screenshot still hangs on the open SSE stream).*
 
 ### Phase 8 — Security hardening (§8.5)
 - ⬜ Node bound to 127.0.0.1 only; nginx sole public door
