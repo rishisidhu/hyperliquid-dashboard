@@ -10,6 +10,15 @@ does · success check · rollback.
 > Overriding rule (§8.5): nothing may harm the blog or get our IP banned by
 > Hyperliquid. If any step affects the blog, **STOP and roll back that step.**
 
+> **STATUS:** initial deploy is **done** — the dashboard is live (frontend
+> `https://niminal.xyz`, backend `https://api.niminal.xyz`). This file is now the
+> reference/redeploy runbook.
+>
+> 🔴 **OUTSTANDING MUST-FIX (before ~Sept 2026):** the acme.sh renewal config on
+> the box still carries the self-truncating `--install-cert` directive that
+> zeroed the cert during deploy. The **next auto-renewal will silently break
+> HTTPS on api.niminal.xyz** unless fixed. Full explanation + fix in **§4**.
+
 ---
 
 ## 0. Open questions to resolve BEFORE starting (repo can't answer these)
@@ -154,32 +163,71 @@ curl -sI http://api.niminal.xyz/.well-known/acme-challenge/test   # reaches ngin
 
 This box uses **acme.sh** (binary `/etc/letsencrypt/acme.sh`, home `/etc/letsencrypt`),
 not certbot. Issue the api cert through its OWN webroot (`/var/www/certbot`,
-created in §2f — separate from the blog's `/var/www/ghost/system/nginx-root`) and
-install it to a dedicated dir. `--server letsencrypt` matches the blog's CA and
-avoids acme.sh's ZeroSSL default (which needs account registration).
+created in §2f — separate from the blog's `/var/www/ghost/system/nginx-root`).
+`--server letsencrypt` matches the blog's CA and avoids acme.sh's ZeroSSL default
+(which needs account registration).
+
+> ## ⚠️ MUST-FIX before the next renewal (~Sept 2026) — acme.sh `--install-cert` self-truncation time-bomb
+>
+> **What happened during deploy:** because acme.sh's `--home` is `/etc/letsencrypt`,
+> its issued cert files live in **`/etc/letsencrypt/api.niminal.xyz/`** (it natively
+> writes `fullchain.cer` and `api.niminal.xyz.key` there). The original deploy ran
+> `--install-cert` with `--fullchain-file`/`--key-file` pointed at **those same
+> paths** — so acme.sh copied the files onto themselves and **truncated
+> `fullchain.cer` + the key to 0 bytes**, breaking HTTPS. It was restored from
+> `backup/` to get the box live.
+>
+> **The bomb:** the renewal config (`/etc/letsencrypt/api.niminal.xyz/api.niminal.xyz.conf`,
+> keys `Le_RealFullChainPath`/`Le_RealKeyPath`/`Le_ReloadCmd`) **still contains that
+> bad install-cert directive**, so the **next auto-renewal (~90 days, before ~Sept
+> 2026) will silently re-truncate the cert** and take `https://api.niminal.xyz`
+> down. nginx will keep serving the cached cert until it reloads, so it may fail
+> quietly/later. **This MUST be fixed on the box before then.**
+>
+> **The fix (do NOT `--install-cert` into acme.sh's own issue dir):** nginx already
+> reads acme.sh's native issue paths directly (the committed
+> `nginx/api.niminal.xyz.conf` points at `/etc/letsencrypt/api.niminal.xyz/fullchain.cer`
+> + `…/api.niminal.xyz.key`), so the install-cert copy is both unnecessary and
+> harmful. Pick ONE:
+> - **(Recommended) Drop install-cert; attach the reload to the issue config.**
+>   Clear the self-referential install paths and set only a reload hook:
+>   ```
+>   # remove the bad real-path copies from the renewal config:
+>   sudo sed -i "/^Le_RealCertPath=/d;/^Le_RealKeyPath=/d;/^Le_RealCACertPath=/d;/^Le_RealFullChainPath=/d" \
+>     /etc/letsencrypt/api.niminal.xyz/api.niminal.xyz.conf
+>   # (re)register just the reload so renewals reload nginx but copy nothing:
+>   sudo /etc/letsencrypt/acme.sh --home /etc/letsencrypt \
+>     --install-cert -d api.niminal.xyz \
+>     --reloadcmd "nginx -t && systemctl reload nginx"
+>   ```
+>   Verify the `.conf` now has an empty/absent `Le_RealFullChainPath` and a
+>   `Le_ReloadCmd`. nginx keeps reading the issue files in place.
+> - **(Alternative) Install to a DIFFERENT dir** (e.g. `/etc/nginx/ssl/api.niminal.xyz/`)
+>   and repoint nginx's `ssl_certificate*` there — destinations distinct from the
+>   issue files, so no self-copy.
+>
+> **Verify the fix is safe** with a dry-run renew (writes nothing if not due):
+> ```
+> sudo /etc/letsencrypt/acme.sh --home /etc/letsencrypt --renew -d api.niminal.xyz --force
+> sudo wc -c /etc/letsencrypt/api.niminal.xyz/fullchain.cer   # MUST be > 0 after a forced renew
+> ```
 
 ```
-# 4a. Issue via HTTP-01 webroot (reuses the existing acme.sh; does NOT touch the
-#     blog cert/webroot/renewal). DNS for api.niminal.xyz must already resolve (§3).
+# 4a. Issue via HTTP-01 webroot + attach an nginx reload for renewals — NO
+#     --install-cert (that's what caused the truncation above). nginx reads the
+#     issue files in place. Does NOT touch the blog cert/webroot/renewal.
+#     DNS for api.niminal.xyz must already resolve (§3).
 sudo /etc/letsencrypt/acme.sh --home /etc/letsencrypt \
   --issue --server letsencrypt \
-  -d api.niminal.xyz -w /var/www/certbot
-
-# 4b. Install the cert to a dedicated dir + register an nginx reload on renewal.
-#     This is what the daily acme.sh cron uses to re-deploy + reload on renewal.
-sudo mkdir -p /etc/letsencrypt/api.niminal.xyz
-sudo /etc/letsencrypt/acme.sh --home /etc/letsencrypt --install-cert \
-  -d api.niminal.xyz \
-  --key-file       /etc/letsencrypt/api.niminal.xyz/api.niminal.xyz.key \
-  --fullchain-file /etc/letsencrypt/api.niminal.xyz/fullchain.cer \
+  -d api.niminal.xyz -w /var/www/certbot \
   --reloadcmd "nginx -t && systemctl reload nginx"
 
-sudo ls -l /etc/letsencrypt/api.niminal.xyz/   # fullchain.cer + api.niminal.xyz.key
+sudo ls -l /etc/letsencrypt/api.niminal.xyz/   # native: fullchain.cer + api.niminal.xyz.key (both > 0 bytes)
 ```
-- **Does:** Issues + installs an isolated LE cert for the subdomain only; the install-cert config persists so the existing `20 0 * * *` acme.sh cron renews it and reloads nginx — all without touching the blog.
-- **Success:** Both files exist at `/etc/letsencrypt/api.niminal.xyz/`; the issue step shows a successful HTTP-01 validation; `sudo /etc/letsencrypt/acme.sh --home /etc/letsencrypt --list` shows `api.niminal.xyz` alongside the blog cert (blog row unchanged).
-- **Rollback:** `sudo /etc/letsencrypt/acme.sh --home /etc/letsencrypt --remove -d api.niminal.xyz && sudo rm -rf /etc/letsencrypt/api.niminal.xyz` (removes it from renewal + deletes the installed copy; the acme.sh-internal copy under the home is dropped by `--remove`).
-- **Guardrails:** never pass the blog's webroot or `-d aigraduate.com`; only `-d api.niminal.xyz -w /var/www/certbot`.
+- **Does:** Issues an isolated LE cert for the subdomain only and records a renewal reload — **without** copying files onto themselves. The committed nginx block reads `fullchain.cer` + `api.niminal.xyz.key` straight from this dir.
+- **Success:** Both files exist at `/etc/letsencrypt/api.niminal.xyz/` and are **non-zero** (`wc -c`); the issue step shows a successful HTTP-01 validation; `--list` shows `api.niminal.xyz` alongside the blog cert (blog row unchanged).
+- **Rollback:** `sudo /etc/letsencrypt/acme.sh --home /etc/letsencrypt --remove -d api.niminal.xyz && sudo rm -rf /etc/letsencrypt/api.niminal.xyz`.
+- **Guardrails:** never pass the blog's webroot or `-d aigraduate.com`; only `-d api.niminal.xyz -w /var/www/certbot`. **Never** point `--install-cert` paths at the acme.sh issue dir (the time-bomb above).
 
 ### 4c. Enable the HTTPS block (cert now exists)
 ```
