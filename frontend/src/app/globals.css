@@ -124,6 +124,18 @@ body {
   color: var(--text-2);
 }
 
+/* footer links — muted, brighten on hover/focus (both themes via tokens) */
+.footer-link {
+  color: var(--text-3);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.footer-link:hover,
+.footer-link:focus-visible {
+  color: var(--text-1);
+  text-decoration: underline;
+}
+
 /* live dot (top bar) */
 @keyframes pulse {
   0%,

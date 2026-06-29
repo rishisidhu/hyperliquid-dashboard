@@ -11,6 +11,7 @@ import { Heartbeat } from "@/components/Heartbeat";
 import { Quadrant } from "@/components/Quadrant";
 import { Board } from "@/components/Board";
 import { HowToReadPanel } from "@/components/HowToReadPanel";
+import { Footer } from "@/components/Footer";
 
 // Relative age, e.g. "2s ago" / "3m ago". Null when we have no timestamp.
 function ago(ms: number, fromMs: number | null): string | null {
@@ -114,6 +115,7 @@ export default function Page() {
             {connected ? "Loading the board…" : "Connecting to the live feed…"}
           </div>
         )}
+        <Footer />
       </div>
     </div>
   );
