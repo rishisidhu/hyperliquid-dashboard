@@ -103,6 +103,19 @@ body {
   color: #fff;
 }
 
+/* live band — heartbeat + regime map, two-up, stacking on narrow screens */
+.live-band {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 30px;
+}
+@media (max-width: 760px) {
+  .live-band {
+    grid-template-columns: 1fr;
+  }
+}
+
 .board-row:hover {
   background: var(--surface-2);
 }

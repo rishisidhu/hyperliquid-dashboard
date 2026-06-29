@@ -3,9 +3,12 @@
 import { useMemo, useState } from "react";
 import { useStream, useNow } from "@/lib/useStream";
 import { useTheme } from "@/lib/useTheme";
+import { useHeartbeat } from "@/lib/useHeartbeat";
 import { hlItem, interp } from "@/lib/viewModel";
 import { TopBar } from "@/components/TopBar";
 import { HeadlineStrip } from "@/components/HeadlineStrip";
+import { Heartbeat } from "@/components/Heartbeat";
+import { Quadrant } from "@/components/Quadrant";
 import { Board } from "@/components/Board";
 import { HowToReadPanel } from "@/components/HowToReadPanel";
 
@@ -26,6 +29,7 @@ function staleAgeStr(ms: number, fromMs: number | null): string {
 export default function Page() {
   const { snapshot, predicted, connected } = useStream();
   const { theme, toggle: toggleTheme } = useTheme();
+  const heartbeat = useHeartbeat(snapshot);
   const now = useNow(1000);
   const [query, setQuery] = useState("");
   const [howToOpen, setHowToOpen] = useState(false);
@@ -82,6 +86,11 @@ export default function Page() {
               shortTop={shortTop}
               shortRest={shortRest}
             />
+            {/* live band — the page's pulse, between the static story and the board */}
+            <div className="live-band">
+              <Heartbeat series={heartbeat} />
+              <Quadrant rows={board.rows} oiFloorUsd={board.oiFloorUsd} />
+            </div>
             <Board
               rows={filtered}
               stale={stale}
