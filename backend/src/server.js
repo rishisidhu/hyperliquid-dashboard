@@ -1,10 +1,15 @@
 // HTTP server — the localhost-only face of the backend (SPEC §6, §8.5).
 // nginx is the sole public door in production; this binds to 127.0.0.1.
-// Routes (GET only): /stream (SSE), /board (one-shot snapshot / REST fallback),
-// /health, /funding-history?coin=NAME.
+// Routes (GET only):
+//   /stream          SSE fan-out                 — public (proxied)
+//   /board           one-shot snapshot / fallback — public (proxied)
+//   /funding-history validated coin sparkline     — public (proxied)
+//   /health          liveness for local ops       — NOT proxied (nginx 404s it)
 //
-// Full §8.5 hardening lands in Phase 8. Seeded here: GET-only, strict origin
-// header, generic errors (no stack traces), no Server/version header.
+// §8.5 hardening (Phase 8): localhost bind, GET-only, CORS locked to the prod
+// origin, validated coin (no upstream pass-through), generic errors with a
+// top-level catch (never leak a stack), no Server/version header, /health
+// public-safe (boolean + counts, no raw error text).
 
 import { createServer } from 'node:http';
 import { config } from './config.js';
@@ -32,7 +37,7 @@ function sendJson(res, status, body) {
 }
 
 export function createApp(sseHub, fundingHistory) {
-  const server = createServer((req, res) => {
+  const handle = (req, res) => {
     // Parse once; route on pathname, read params from the query.
     const url = new URL(req.url || '/', 'http://localhost');
     const path = url.pathname;
@@ -43,14 +48,15 @@ export function createApp(sseHub, fundingHistory) {
     }
 
     if (path === '/health') {
+      // Public-safe: boolean + counts only. No raw error text (and nginx does
+      // not proxy /health anyway — it's for local ops). §8.5 item 4.
       const snap = cache.snapshot();
       sendJson(res, 200, {
-        status: 'ok',
+        healthy: snap.board != null && !snap.stale,
         stale: snap.stale,
         updatedAt: snap.updatedAt,
         coinCount: snap.board?.coinCount ?? 0,
         sseClients: sseHub.count,
-        lastError: cache.lastError,
       });
       return;
     }
@@ -89,6 +95,17 @@ export function createApp(sseHub, fundingHistory) {
     }
 
     sendJson(res, 404, { error: 'not_found' });
+  };
+
+  const server = createServer((req, res) => {
+    // Top-level guard: any unexpected throw becomes a generic 500 — no route
+    // can ever leak a stack trace or internal detail to a client (§8.5 item 4).
+    try {
+      handle(req, res);
+    } catch {
+      if (!res.headersSent) sendJson(res, 500, { error: 'internal' });
+      else if (!res.writableEnded) res.end();
+    }
   });
 
   // Generic error surface — never leak stack traces (SPEC §8.5 item 4).
