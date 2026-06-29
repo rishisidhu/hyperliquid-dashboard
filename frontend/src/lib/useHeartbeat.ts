@@ -3,21 +3,24 @@
 import { useEffect, useRef, useState } from "react";
 import type { Snapshot, SkewSide } from "./types";
 
-// Rolling client-side window of recent signed annualized-funding samples, fed by
-// each ~2s snapshot (no new endpoint — reuses the stream). We track every coin's
-// recent funding, then expose the current top-5 by open interest. Membership can
-// shift tick to tick; series persist so a coin re-entering keeps its history.
+// Rolling client-side window of recent LIVE PREMIUM (mark vs oracle, %) samples,
+// fed by each ~2s snapshot (no new endpoint — reuses the stream). Premium moves
+// continuously tick-to-tick (unlike hourly funding, which looks flat over
+// minutes) and is on-thesis: it's the real-time crowd-pressure signal funding
+// lags. We track every coin, then expose the current top-5 by open interest.
+// (Fallback metric, ready if premium reads too noisy live: normalized mid-price
+// % change since the window opened — a small swap here + in the component.)
 
 const WINDOW = 60; // ~2 minutes at a 2s cadence
 
 export interface HeartbeatSeries {
   coin: string;
-  funding: number[]; // most recent last; up to WINDOW samples
-  side: SkewSide; // current lean (colours the line)
+  values: number[]; // premium %, most recent last; up to WINDOW samples
+  side: SkewSide; // current crowd lean (colours the line)
 }
 
 interface Entry {
-  funding: number[];
+  values: number[];
   oi: number;
   side: SkewSide;
 }
@@ -34,11 +37,11 @@ export function useHeartbeat(snapshot: Snapshot | null): HeartbeatSeries[] {
 
     const m = seriesRef.current;
     for (const r of board.rows) {
-      const f = r.annualizedFundingPct;
-      if (f == null || !Number.isFinite(f)) continue;
-      const e = m.get(r.coin) ?? { funding: [], oi: 0, side: "none" as SkewSide };
-      e.funding.push(f);
-      if (e.funding.length > WINDOW) e.funding.shift();
+      const p = r.premium;
+      if (p == null || !Number.isFinite(p)) continue;
+      const e = m.get(r.coin) ?? { values: [], oi: 0, side: "none" as SkewSide };
+      e.values.push(p * 100); // ratio → percent
+      if (e.values.length > WINDOW) e.values.shift();
       e.oi = r.oiNotional ?? e.oi;
       e.side = r.skew.side;
       m.set(r.coin, e);
@@ -51,5 +54,5 @@ export function useHeartbeat(snapshot: Snapshot | null): HeartbeatSeries[] {
     .filter(([, e]) => e.oi > 0)
     .sort((a, b) => b[1].oi - a[1].oi)
     .slice(0, 5)
-    .map(([coin, e]) => ({ coin, funding: e.funding, side: e.side }));
+    .map(([coin, e]) => ({ coin, values: e.values, side: e.side }));
 }
