@@ -431,12 +431,13 @@ Base URL: `https://api.hyperliquid.xyz`
 - ⬜ Blog health re-checked (aigraduate.com unaffected)
 - *Notes:*
   - *Dependencies: install project-local only — `npm ci` (uses the committed `package-lock.json`) inside `backend/` under the service user's own directory. Never `npm install -g` / system-wide (§8.5 isolation). `better-sqlite3@^11` is prebuilt, so **no compiler toolchain** (build-essential/python) needs to be installed on the droplet.*
+  - *2026-07-01 — **Runbook authored: `backend/deploy/RUNBOOK.md`** (not executed). Precise, ordered, copy-pasteable steps drawn from `backend/deploy/`; each step has command · what it does · success check · rollback. Order is blog-safe and additive: pre-flight backups → backend up **privately** (user/code/`npm ci`/systemd, localhost-verified) → nginx rate-limit drop-in + HTTP-only api block → DNS A record → certbot (separate cert) → enable 443 → **verify backend over TLS AND blog health (explicit STOP-if-blog-affected gate)** → confirm DO firewall 80/443/22 → Vercel repoint (env var set before build) → final E2E + per-layer rollback. **Operator executes each command by hand with review; assistant runs nothing against droplet/DNS/Vercel.** Resolves the cert chicken-and-egg (HTTP-only block → DNS → webroot certbot → enable 443) and the NEXT_PUBLIC build-time-inlining gotcha. Open questions captured at the top of the runbook (droplet IP, code transport, node path, nginx convention, certbot method/webroot, port 8765 free, Vercel git-connection, canonical origin/www, current firewall rules).*
 
 ### Open questions
-- ⬜ Poll-first vs WS-first upstream? (Recommend REST poll first.)
+- ✅ **RESOLVED — Poll-first upstream.** Shipped as REST poll (`metaAndAssetCtxs` ~2s); the WS-to-HL swap stays a future optimization, not needed at current scale.
 - ✅ **RESOLVED 2026-06-25 — Skew-badge thresholds → LOG intensity scale.** Replaced the linear `SKEW_BALANCED_MAX=5`/`SKEW_EXTREME_MIN=50` with a log map between `BALANCED_ANN_PCT=5` and `EXTREME_ANN_PCT=700` (clamped beyond HI). See the decision-log entry below for the mapping table and why log beats linear/percentile/piecewise on this distribution.
 - ✅ **RESOLVED 2026-06-25 — Headline weighting → R1 (`|ann %|` + OI floor), backend-canonical.** Rank by `|annualized %|` desc among markets above `OI_FLOOR_USD` (default $1M), tiebreak OI desc then coin asc. Computed once in the backend (`deriveHeadlines`); the frontend consumes `board.headlines` instead of recomputing — resolving the backend-vs-frontend split too. (Rejected funding×OI: the card's hero number is funding %, so ranking by it keeps each card self-consistent and the superlative truthful.)
-- ⬜ api.niminal.xyz behind Cloudflare or direct? (Direct A record to start; buffering proxies can break SSE.)
+- ✅ **RESOLVED — Direct A record (no Cloudflare/CDN)** for api.niminal.xyz: a buffering proxy breaks SSE. Specified in the runbook DNS step; revisit only if abuse appears (and test SSE behind any proxy first).
 - ⬜ Identify what owns the two Postgres clusters before deploy (avoid surprises).
 
 ### Decision / pivot log (append-only)
