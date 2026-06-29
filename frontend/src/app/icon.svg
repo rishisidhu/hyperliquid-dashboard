@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Niminal mark. A favicon is a standalone asset rendered outside the page's
+       CSS, so it can't read theme tokens — these are the brand token VALUES
+       (--bg #0a0c12, --text-1 #eceff4) baked in as literals. Dark square keeps
+       the "N" legible on both light and dark browser chrome. -->
+  <rect width="32" height="32" rx="6" fill="#0a0c12"/>
+  <path d="M9 24 L9 8 L23 24 L23 8" fill="none" stroke="#eceff4"
+        stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

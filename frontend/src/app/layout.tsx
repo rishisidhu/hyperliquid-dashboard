@@ -14,9 +14,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Crowd · Hyperliquid perp positioning",
+  title: "Niminal · Crowd — Hyperliquid perp positioning",
   description:
-    "How crowded each Hyperliquid perp is, what the crowd pays to stay in, and how it compares across venues.",
+    "Niminal · Crowd — see how crowded each Hyperliquid perp is, what the crowd pays to stay in, and how funding compares across venues.",
 };
 
 export default function RootLayout({

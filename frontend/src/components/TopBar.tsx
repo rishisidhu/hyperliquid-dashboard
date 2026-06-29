@@ -51,16 +51,18 @@ export function TopBar({
       }}
     >
       <div style={{ display: "flex", alignItems: "baseline", gap: 9 }}>
+        {/* Wordmark: Niminal (brand, primary) · Crowd (product) */}
         <span
           style={{
             fontFamily: mono,
             fontWeight: 700,
             letterSpacing: ".14em",
             fontSize: 14,
-            color: "var(--text-1)",
           }}
         >
-          CROWD
+          <span style={{ color: "var(--text-1)" }}>Niminal</span>
+          <span style={{ color: "var(--text-3)" }}> · </span>
+          <span style={{ color: "var(--text-2)" }}>Crowd</span>
         </span>
         <span
           style={{ fontSize: 11.5, color: "var(--text-3)", letterSpacing: ".02em" }}
