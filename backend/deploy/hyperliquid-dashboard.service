@@ -1,0 +1,58 @@
+# systemd unit for the Hyperliquid dashboard backend (SPEC §8.5).
+# AUTHORED IN PHASE 8 — applied on the droplet in Phase 9 only. Do not install yet.
+#
+# Runs the read-only poller + SSE fan-out as a dedicated UNPRIVILEGED user, bound
+# to 127.0.0.1 (nginx is the sole public door), with hard resource caps so the
+# dashboard can NEVER starve the co-hosted blog (Ghost + MySQL + Postgres) on the
+# 1 GB / 1 vCPU box. See deploy/README.md for the cap rationale and apply steps.
+
+[Unit]
+Description=Hyperliquid crowd-positioning dashboard (read-only poller + SSE fan-out)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hldash
+Group=hldash
+WorkingDirectory=/opt/hldash/backend
+# Adjust if `which node` differs on the box (e.g. nodesource installs /usr/bin/node).
+ExecStart=/usr/bin/node src/index.js
+Restart=on-failure
+RestartSec=3
+
+# --- environment: localhost-only bind, production CORS origin ---
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=8765
+Environment=CORS_ORIGIN=https://niminal.xyz
+Environment=OI_DB_PATH=/var/lib/hldash/oi.sqlite
+
+# --- resource caps: conservative starting values (tune on the box) ---
+# Rationale per cap is in deploy/README.md. The intent: the dashboard's ceiling
+# leaves the blog comfortable headroom on a shared 1 GB / 1 vCPU droplet.
+MemoryHigh=128M
+MemoryMax=160M
+CPUQuota=35%
+TasksMax=64
+
+# --- least privilege / blast-radius isolation (§8.5 item 5) ---
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_INET AF_INET6
+# ProtectSystem=strict makes the whole FS read-only except this writable path
+# (the SQLite file + its WAL/SHM live here, owned by the service user).
+ReadWritePaths=/var/lib/hldash
+
+[Install]
+WantedBy=multi-user.target
