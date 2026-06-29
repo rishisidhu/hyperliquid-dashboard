@@ -32,6 +32,10 @@
   --flat: #79818f;
   --stale: oklch(0.74 0.1 60);
   --pip-off: #2c3340;
+  /* chrome helpers (themed; no hardcoded colours in components) */
+  --header-bg: color-mix(in srgb, var(--bg) 90%, transparent); /* translucent blur bar; tracks --bg per theme */
+  --scrim: rgba(8, 9, 11, 0.72); /* modal backdrop — intentionally a dark overlay */
+  --shadow-color: rgba(0, 0, 0, 0.5); /* elevation shadows */
   /* layout: board column template */
   --board-cols: minmax(150px, 1.3fr) minmax(184px, 1.5fr) 116px 104px 92px 104px 150px;
 
@@ -69,6 +73,9 @@
   --flat: #616b78;
   --stale: oklch(0.55 0.13 65);
   --pip-off: #d5dae2;
+  /* chrome helpers — --header-bg auto-tracks the light --bg via color-mix above */
+  --scrim: rgba(20, 24, 31, 0.4); /* lighter overlay still dims the page */
+  --shadow-color: rgba(20, 28, 45, 0.16); /* softer, cooler on light */
 }
 
 * {

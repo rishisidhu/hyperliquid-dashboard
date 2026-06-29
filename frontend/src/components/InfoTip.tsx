@@ -94,7 +94,7 @@ export function InfoTip({ term, stopPropagation }: InfoTipProps) {
             background: "var(--surface-3)",
             border: "1px solid var(--border-strong)",
             borderRadius: 7,
-            boxShadow: "0 8px 24px rgba(0,0,0,.45)",
+            boxShadow: "0 8px 24px var(--shadow-color)",
             textTransform: "none",
             letterSpacing: "normal",
             cursor: "auto",

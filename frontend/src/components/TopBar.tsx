@@ -45,7 +45,7 @@ export function TopBar({
         gap: 18,
         height: 52,
         padding: "0 22px",
-        background: "rgba(8,9,11,.92)",
+        background: "var(--header-bg)",
         backdropFilter: "blur(8px)",
         borderBottom: "1px solid var(--border)",
       }}

@@ -67,7 +67,7 @@ export function HowToReadPanel({ open, onClose }: HowToReadPanelProps) {
         position: "fixed",
         inset: 0,
         zIndex: 100,
-        background: "rgba(8,9,11,.72)",
+        background: "var(--scrim)",
         backdropFilter: "blur(3px)",
         display: "flex",
         alignItems: "flex-start",
@@ -87,7 +87,7 @@ export function HowToReadPanel({ open, onClose }: HowToReadPanelProps) {
           background: "var(--surface-1)",
           border: "1px solid var(--border-strong)",
           borderRadius: 11,
-          boxShadow: "0 20px 60px rgba(0,0,0,.55)",
+          boxShadow: "0 20px 60px var(--shadow-color)",
         }}
       >
         <div

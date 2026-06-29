@@ -236,7 +236,8 @@ Base URL: `https://api.hyperliquid.xyz`
 6. Education layer — **real tooltips on every term** (funding, premium, OI, crowd skew, annualized, OI-trend); the **"How to read this board"** control opens an **actual panel** (Phase 3 ships it as a non-functional stub); skew-badge copy, headline microcopy; descriptive-only, no buy/sell.
 7. Polish — OI-cap flags, reconnect/backoff, stale labeling, **+ board density/UX** (focused Top-N default that never hides large markets — see §12 board-density spec).
 7.5 **Theming (light mode)** — light-palette counterpart for the existing CSS-variable tokens under a theme selector (`data-theme` / `prefers-color-scheme`); session-persisted toggle; re-tuned OKLCH lightness for the skew ramp so teal/amber stay legible + colorblind-safe on light. After polish, before deploy.
-8. **Security hardening** — implement all §8.5 controls; verify Node is localhost-only, CORS locked, resource caps active, no info leakage.
+7.6 **Live depth & discoverability** — make the page feel alive and surface the differentiator: light-mode header-bug fix + token-leak cleanup (completes 7.5); row-expand affordance; live "heartbeat" chart (top-5-by-OI signed funding, animated per snapshot); OI/price quadrant regime scatter (animated drift). Frontend-only, reuses the existing stream (no new endpoint). **Inserted before hardening/deploy on purpose** — see §12.
+8. **Security hardening** — implement all §8.5 controls; verify Node is localhost-only, CORS locked, resource caps active, no info leakage. *(stays LAST-but-one — runs against the final feature set.)*
 9. **Deploy / cutover** — Vercel frontend replace + `api.niminal.xyz` backend per §8; verify blog unaffected.
 10. (v2) sector grouping, alerts, mobile, abuse logging.
 
@@ -384,6 +385,15 @@ Base URL: `https://api.hyperliquid.xyz`
     | 700% | 1.000 | `oklch(0.460 0.160 195)` | `oklch(0.500 0.170 70)` |
 
   - ***Verification:*** *`next build` green; 29 backend + 7 FE tests pass. `theme` threaded through `rowVM`/`hlItem`; all `pips()`/`skewColor()` call sites updated. Visual confirmation of both themes deferred to the operator's browser (headless screenshot still hangs on the open SSE stream).*
+
+### Phase 7.6 — Live depth & discoverability
+- 🟡 Light-mode header-bug fix + token-leak cleanup (completes 7.5)
+- ⬜ Row-expand affordance (chevron + hover hint)
+- ⬜ Live "heartbeat" chart (top-5-by-OI signed funding, animated per snapshot)
+- ⬜ OI/price quadrant regime scatter (animated drift; warming cold-start)
+- *Notes:*
+  - ***Sequencing rationale (2026-06-29).*** *Roadmap order changed: feature work (this phase) is inserted BEFORE Phase 8 (security hardening) and Phase 9 (deploy), which stay last. Reason: the §8.5 hardening audit and the cutover must run against the FINAL feature set — if we hardened/deployed first, later feature changes (new components, new client behaviour) would invalidate the audit and the deploy. Hardening + deploy always go last. (Phase 7.6 is frontend-only and adds NO server endpoint — it reuses the existing SSE stream — so it doesn't expand the eventual hardening surface.)*
+  - ***Header bug + token leaks.*** *The sticky header used a hardcoded `rgba(8,9,11,.92)` (dark `--bg`), so in light mode it stayed dark-on-dark. Migrated to a themed `--header-bg` (a `color-mix` of `--bg` that auto-tracks the theme). Grep also found the modal scrim and two elevation box-shadows hardcoded — tokenized as `--scrim` and `--shadow-color` (per-theme). No hardcoded colours remain in components.*
 
 ### Phase 8 — Security hardening (§8.5)
 - ⬜ Node bound to 127.0.0.1 only; nginx sole public door
