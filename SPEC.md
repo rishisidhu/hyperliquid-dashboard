@@ -403,16 +403,21 @@ Base URL: `https://api.hyperliquid.xyz`
   - ***Discipline/verification.*** *Tokens-only (no new hardcoded colours), colourblind-safe (teal/amber + position + labels), **zero new deps** (inline SVG + CSS), reduced-motion disables pulse/drift. Backend untouched; no new endpoint (hardening surface unchanged). `next build` green; 29 backend + 7 FE tests pass. Visual review in-browser by the operator (headless screenshot still hangs on the open SSE stream).*
 
 ### Phase 8 — Security hardening (§8.5)
-- ⬜ Node bound to 127.0.0.1 only; nginx sole public door
-- ⬜ Dedicated unprivileged service user; no access to blog/DB dirs
-- ⬜ systemd resource caps (MemoryMax/CPUQuota/TasksMax) so blog can't be starved
-- ⬜ nginx limit_conn + limit_req per IP; client_max_body_size small; read timeouts
-- ⬜ App-level max concurrent SSE/WS cap → 503 beyond
-- ⬜ CORS locked to https://niminal.xyz, GET only
-- ⬜ No pass-through to Hyperliquid; coin params validated vs universe allow-list
-- ⬜ server_tokens off; no stack traces; health/SQLite not public
-- ⬜ Firewall: 80/443/22 only; Node port not public
+- ✅ Node bound to 127.0.0.1 only; nginx sole public door *(verified live across ALL endpoints)*
+- ✅ Dedicated unprivileged service user; no access to blog/DB dirs *(authored: systemd unit)*
+- ✅ systemd resource caps (MemoryMax/CPUQuota/TasksMax) so blog can't be starved *(authored)*
+- ✅ nginx limit_conn + limit_req per IP; client_max_body_size small; read timeouts *(authored)*
+- ✅ App-level max concurrent SSE cap → 503 beyond *(in code — `MAX_SSE_CLIENTS`)*
+- ✅ CORS locked to https://niminal.xyz, GET only *(in code; prod default unweakened)*
+- ✅ No pass-through to Hyperliquid; coin params validated vs universe allow-list *(in code; re-verified)*
+- ✅ server_tokens off; no stack traces; health/SQLite not public *(nginx `server_tokens off` + `/health` 404; code generic 500 + public-safe /health)*
+- ⬜ Firewall: 80/443/22 only; Node port not public *(DO cloud firewall — applied in Phase 9; localhost bind already keeps the Node port unreachable)*
 - *Notes:*
+  - *2026-07-01 — Phase 8 complete (code hardened + deploy config authored; **nothing applied to the droplet** — that's Phase 9). The payoff of seeding §8.5 controls in earlier phases: most were already in place; Phase 8 was a small code delta + authoring deploy artifacts + verification.*
+  - ***Code (applied now):*** *Top-level `try/catch` around the request handler → guaranteed generic `500 {error:"internal"}`, so no route can leak a stack. `/health` reduced to a public-safe shape (`healthy` boolean + counts; dropped raw `lastError`) per your ask — kept for local ops, and nginx 404s it so it's never public. Re-verified live with no regression across later phases: localhost-only bind on all endpoints (socket on `127.0.0.1:8080`, not `0.0.0.0`); GET-only (POST→405); `/funding-history` BTC→200, NOTACOIN/`%2e%2e%2f…`/empty→400. 29 backend tests pass.*
+  - ***Deploy config (authored, NOT applied — `backend/deploy/`):*** *`hyperliquid-dashboard.service` (unprivileged `hldash` user, `MemoryHigh=128M`/`MemoryMax=160M`/`CPUQuota=35%`/`TasksMax=64`, `ProtectSystem=strict`+`PrivateTmp`+scoped `ReadWritePaths=/var/lib/hldash`, `HOST=127.0.0.1`, `CORS_ORIGIN=https://niminal.xyz`); `nginx/api.niminal.xyz.conf` (new isolated block — SSE proxy buffering off + 1h read timeout, TLS w/ separate cert, `limit_req`/`limit_conn`, `client_max_body_size 1k`, `server_tokens off`, `location = /health { return 404; }`, non-API → 404); `nginx/rate-limits.conf` (http-context zones for `conf.d/` so the blog's `nginx.conf` is never touched); `README.md` (cap rationale sized for the 1 GB/1 vCPU shared box, apply steps, §8.5 control→artifact map).*
+  - ***§8.5 drift reconciliation (doc now matches reality):*** *(1) Client fan-out is **SSE only** — there is no WebSocket to browsers; the **upstream is still REST poll** (the WS-to-HL swap was deferred), so §8.5's "reconnect-with-backoff to HL WS" reads as N/A — the real control is the REST-poll backoff (present). (2) The endpoint set grew after §8.5 was written: `/board` (REST fallback — kept **public**) and `/funding-history` (the one **user-input** path — public + validated); `/health` is **not** public. (3) "coin params validated vs universe" is now **concrete** (`/funding-history`), not aspirational. (4) The Phase-7.6 client features (heartbeat/quadrant) add **no endpoint** — hardening surface unchanged.*
+  - ***Line held:*** *Phase 8 produced hardened code + repo config only. The droplet, DNS, Vercel, and certs are untouched — Phase 9 applies everything.*
 
 ### Phase 9 — Deploy / cutover (§8)
 - ⬜ Back up existing niminal Vercel app (Git + snapshot)
