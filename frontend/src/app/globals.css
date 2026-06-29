@@ -1,30 +1,37 @@
-/* Design tokens — copied verbatim from design/design-tokens.md. Color is
-   signal, never theme; intensity is carried by filled segments; long = teal,
-   short = amber, never red/green. */
+/* Design tokens. Dark trading-terminal identity. Color is signal, never theme;
+   intensity is carried by filled segments; long = teal, short = amber, never
+   red/green. The accent palette (long/short/rising/…) is reserved for DATA
+   meaning — chrome energy comes from contrast/depth, not flooding the UI with
+   colour.
+
+   Dark base re-tuned 2026-06-28 (contrast & depth pass): bigger lightness steps
+   between bg → surfaces so panels read as distinct objects (were melting in);
+   a faint cool slate tint on the near-black so it reads "deep" not "dead";
+   stronger borders for visible panel edges; slightly brighter text tiers. */
 :root {
-  /* base & surfaces */
-  --bg: #08090b;
-  --surface-1: #0d0f13;
-  --surface-2: #13161c;
-  --surface-3: #1a1e25;
-  --border: #1e222a;
-  --border-strong: #2b313b;
-  /* text tiers */
-  --text-1: #e9ecf1;
-  --text-2: #a6aebb;
-  --text-3: #6b7480;
-  --text-4: #454c56;
-  /* meaning */
+  /* base & surfaces (cool slate, elevated steps) */
+  --bg: #0a0c12;
+  --surface-1: #12151e;
+  --surface-2: #1a1f2b;
+  --surface-3: #232a38;
+  --border: #2a3140;
+  --border-strong: #3a4456;
+  /* text tiers (brighter, faint cool) */
+  --text-1: #eceff4;
+  --text-2: #b2bac7;
+  --text-3: #79818f;
+  --text-4: #4c5462;
+  /* meaning — reserved for data signal; unchanged hues (colourblind-safe) */
   --long: oklch(0.74 0.12 195);
   --long-dim: oklch(0.5 0.045 195);
   --short: oklch(0.78 0.135 70);
   --short-dim: oklch(0.56 0.055 70);
-  --balanced: #5a626d;
+  --balanced: #626b78;
   --rising: oklch(0.78 0.1 155);
   --unwinding: oklch(0.66 0.085 285);
-  --flat: #6b7480;
+  --flat: #79818f;
   --stale: oklch(0.74 0.1 60);
-  --pip-off: #262b34;
+  --pip-off: #2c3340;
   /* layout: board column template */
   --board-cols: minmax(150px, 1.3fr) minmax(184px, 1.5fr) 116px 104px 92px 104px 150px;
 

@@ -15,11 +15,14 @@ function HeadlineCard({ side, title, top, rest }: CardProps) {
   return (
     <div
       style={{
-        background: `linear-gradient(180deg, color-mix(in oklch, ${accent}, transparent 94%), var(--surface-1) 55%)`,
+        background: `linear-gradient(180deg, color-mix(in oklch, ${accent}, transparent 92%), var(--surface-1) 55%)`,
         border: "1px solid var(--border)",
         borderTop: `2px solid ${accent}`,
         borderRadius: 9,
         padding: "18px 20px 16px",
+        // Subtle accent glow off the top edge so the hero cards feel alive
+        // (restrained — energy from depth, not flooding colour).
+        boxShadow: `0 -1px 0 0 color-mix(in oklch, ${accent}, transparent 55%), 0 10px 34px -18px color-mix(in oklch, ${accent}, transparent 60%)`,
       }}
     >
       <div
