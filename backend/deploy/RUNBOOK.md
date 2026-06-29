@@ -14,17 +14,19 @@ does · success check · rollback.
 
 ## 0. Open questions to resolve BEFORE starting (repo can't answer these)
 
-1. **Droplet public IP** — for the DNS A record and SSH. (Kept out of the repo per §11.)
-2. **Code transport to the box** — is this repo reachable from the droplet (git clone via HTTPS/deploy key) or should you `rsync`/`scp` from local? Is `/opt/hldash` an acceptable target path?
-3. **Node on the box** — installed and ≥ v20? Output of `which node` (for the unit's `ExecStart`)? Is `npm` present for `npm ci`?
-4. **nginx layout convention** — does this box use `sites-available/ + sites-enabled/` (symlink) or `conf.d/`? Where do the blog's server blocks live, and does the main `nginx.conf` `include` `conf.d/*.conf` (needed for `rate-limits.conf`)?
-5. **certbot setup** — were the blog's certs issued via the **`--nginx` plugin** or **`--webroot`**? If webroot, what path (is `/var/www/certbot` already used, or another)? Is the renewal timer active (`systemctl list-timers | grep certbot`)?
-6. **Node port `8765` free?** — confirm no blog service uses it (`ss -ltnp | grep 8765` should be empty).
-7. **Vercel** — is the `niminal.xyz` project Git-connected, and to which repo/branch? Is this monorepo pushed there (so Vercel "Root Directory" = `frontend/`)? Do you have access to set env vars + root directory?
-8. **Canonical frontend origin** — is the site served only at `https://niminal.xyz` (apex), or also `www.niminal.xyz`? The backend CORS allows **only** `https://niminal.xyz`; if `www` is used it must redirect to apex (or the origin be added).
-9. **DO cloud firewall** — current inbound rules (to confirm 80/443/22 only and that `8765` is not exposed).
+**Resolved by the 2026-07-xx box investigation:**
+- **TLS:** acme.sh (`/etc/letsencrypt/acme.sh`, home `/etc/letsencrypt`), daily cron `20 0 * * *`. Blog cert = webroot HTTP-01, `Le_Webroot=/var/www/ghost/system/nginx-root`, installed at `/etc/letsencrypt/aigraduate.com/` (acme.sh `.cer` naming). → We issue the api cert via a **separate** webroot `/var/www/certbot`, install to `/etc/letsencrypt/api.niminal.xyz/`. (§4)
+- **nginx:** `sites-enabled/` (blog blocks) **and** `conf.d/` both included → `<NGINX_SITES_DIR>` = `/etc/nginx/sites-enabled` (or sites-available + symlink); rate-limit drop-in goes in `/etc/nginx/conf.d/`.
+- **Node:** v20 at `/usr/bin/node` (matches the unit's `ExecStart`); `hldash` user exists; code at `/opt/hldash/backend`; `npm ci` done; **port 8765 free**.
 
-Placeholders below: `<DROPLET_IP>`, `<NODE_PATH>` (from Q3), `<NGINX_SITES_DIR>` (from Q4), `<WEBROOT>` (from Q5).
+**Still needed from you:**
+1. **Droplet public IP** — for the DNS A record (you SSH via the DO web console).
+2. **Code freshness** — `/opt/hldash/backend` already has the code + `npm ci`; confirm it's at the commit you intend to deploy (this Phase-9 revision changed the nginx file — re-pull/rsync if needed so the box has the acme.sh-path version).
+7. **Vercel** — is the `niminal.xyz` project Git-connected, and to which repo/branch? Is this monorepo pushed there (so Vercel "Root Directory" = `frontend/`)? Access to set env vars + root directory?
+8. **Canonical frontend origin** — only `https://niminal.xyz` (apex), or also `www.niminal.xyz`? Backend CORS allows **only** `https://niminal.xyz`; if `www` is used it must redirect to apex (or the origin be added + service restarted).
+9. **DO cloud firewall** — current inbound rules (confirm 80/443/22 only; `8765` not exposed).
+
+Placeholder below: `<DROPLET_IP>`. (`<NGINX_SITES_DIR>` = the sites-enabled path above.)
 
 ---
 
@@ -42,7 +44,7 @@ Placeholders below: `<DROPLET_IP>`, `<NODE_PATH>` (from Q3), `<NGINX_SITES_DIR>`
 uptime && free -m && df -h
 ss -ltnp                                  # record listening ports (expect 80/443/22, blog services)
 nginx -T > /tmp/nginx-baseline.txt 2>&1   # full effective nginx config (baseline)
-systemctl list-timers | grep -i certbot   # confirm renewal timer
+sudo crontab -l | grep -i acme            # confirm acme.sh renewal cron (20 0 * * *)
 curl -sI https://aigraduate.com | head -1 # blog baseline (expect 200/301)
 ```
 - **What it does:** Records a known-good baseline and a restorable snapshot.
@@ -115,7 +117,7 @@ sudo nginx -t
 
 ### 2f. nginx api block — HTTP-only first (for the ACME challenge)
 ```
-sudo install -d -o www-data -g www-data /var/www/certbot     # or match existing <WEBROOT> (Q5)
+sudo install -d -o www-data -g www-data /var/www/certbot     # NEW, separate webroot (not the blog's)
 # Copy the authored block, but TEMPORARILY comment out the entire `server { listen 443 ... }`
 # block (the 443 server references a cert that doesn't exist yet):
 sudo cp /opt/hldash/backend/deploy/nginx/api.niminal.xyz.conf <NGINX_SITES_DIR>/api.niminal.xyz.conf
@@ -148,25 +150,44 @@ curl -sI http://api.niminal.xyz/.well-known/acme-challenge/test   # reaches ngin
 
 ---
 
-## 4. TLS — separate cert for api.niminal.xyz (never touches blog certs)
+## 4. TLS — separate cert for api.niminal.xyz via **acme.sh** (never touches blog certs)
+
+This box uses **acme.sh** (binary `/etc/letsencrypt/acme.sh`, home `/etc/letsencrypt`),
+not certbot. Issue the api cert through its OWN webroot (`/var/www/certbot`,
+created in §2f — separate from the blog's `/var/www/ghost/system/nginx-root`) and
+install it to a dedicated dir. `--server letsencrypt` matches the blog's CA and
+avoids acme.sh's ZeroSSL default (which needs account registration).
 
 ```
-# Webroot method (preferred — does not edit nginx config). Match <WEBROOT> to Q5.
-sudo certbot certonly --webroot -w /var/www/certbot -d api.niminal.xyz
-sudo ls /etc/letsencrypt/live/api.niminal.xyz/        # fullchain.pem, privkey.pem
-```
-- **Does:** Issues an isolated cert for the subdomain only.
-- **Success:** Cert files exist; blog certs unchanged (`sudo certbot certificates` lists the new one alongside the blog's, none modified).
-- **Rollback:** `sudo certbot delete --cert-name api.niminal.xyz`.
-- **Note:** If the blog uses the **`--nginx`** plugin (Q5), the consistent alternative is `sudo certbot --nginx -d api.niminal.xyz` — but webroot is safer here because it won't rewrite any server block. Decide per Q5.
+# 4a. Issue via HTTP-01 webroot (reuses the existing acme.sh; does NOT touch the
+#     blog cert/webroot/renewal). DNS for api.niminal.xyz must already resolve (§3).
+sudo /etc/letsencrypt/acme.sh --home /etc/letsencrypt \
+  --issue --server letsencrypt \
+  -d api.niminal.xyz -w /var/www/certbot
 
-### 4b. Enable the HTTPS block
+# 4b. Install the cert to a dedicated dir + register an nginx reload on renewal.
+#     This is what the daily acme.sh cron uses to re-deploy + reload on renewal.
+sudo mkdir -p /etc/letsencrypt/api.niminal.xyz
+sudo /etc/letsencrypt/acme.sh --home /etc/letsencrypt --install-cert \
+  -d api.niminal.xyz \
+  --key-file       /etc/letsencrypt/api.niminal.xyz/api.niminal.xyz.key \
+  --fullchain-file /etc/letsencrypt/api.niminal.xyz/fullchain.cer \
+  --reloadcmd "nginx -t && systemctl reload nginx"
+
+sudo ls -l /etc/letsencrypt/api.niminal.xyz/   # fullchain.cer + api.niminal.xyz.key
+```
+- **Does:** Issues + installs an isolated LE cert for the subdomain only; the install-cert config persists so the existing `20 0 * * *` acme.sh cron renews it and reloads nginx — all without touching the blog.
+- **Success:** Both files exist at `/etc/letsencrypt/api.niminal.xyz/`; the issue step shows a successful HTTP-01 validation; `sudo /etc/letsencrypt/acme.sh --home /etc/letsencrypt --list` shows `api.niminal.xyz` alongside the blog cert (blog row unchanged).
+- **Rollback:** `sudo /etc/letsencrypt/acme.sh --home /etc/letsencrypt --remove -d api.niminal.xyz && sudo rm -rf /etc/letsencrypt/api.niminal.xyz` (removes it from renewal + deletes the installed copy; the acme.sh-internal copy under the home is dropped by `--remove`).
+- **Guardrails:** never pass the blog's webroot or `-d aigraduate.com`; only `-d api.niminal.xyz -w /var/www/certbot`.
+
+### 4c. Enable the HTTPS block (cert now exists)
 ```
 sudo nano <NGINX_SITES_DIR>/api.niminal.xyz.conf     # un-comment the `server { listen 443 ... }` block
 sudo nginx -t && sudo systemctl reload nginx
 ```
 - **Success:** `nginx -t` OK; reload OK; blog still healthy.
-- **Rollback:** re-comment the 443 block (or remove the file), reload.
+- **Rollback:** re-comment the 443 block (or remove the file), `sudo nginx -t && sudo systemctl reload nginx`.
 
 ---
 
@@ -233,7 +254,7 @@ curl -sI https://niminal.xyz | head -1                  # 200, served by Vercel
 - **Backend bad:** `sudo systemctl disable --now hyperliquid-dashboard`. The api subdomain stops serving; the blog and apex are untouched. Optionally remove the nginx api file + reload.
 - **nginx issue:** remove `api.niminal.xyz.conf` (+ symlink) and `conf.d/hldash-rate-limits.conf`, `sudo nginx -t && sudo systemctl reload nginx` — back to the blog-only baseline (compare against `/tmp/nginx-baseline.txt`).
 - **DNS:** delete the `api` A record at BigRock.
-- **Cert:** `sudo certbot delete --cert-name api.niminal.xyz` (blog certs never touched).
+- **Cert:** `sudo /etc/letsencrypt/acme.sh --home /etc/letsencrypt --remove -d api.niminal.xyz && sudo rm -rf /etc/letsencrypt/api.niminal.xyz` (blog cert/webroot/renewal never touched).
 - **Whole box:** restore the pre-flight DigitalOcean snapshot (1b) — last resort.
 
 Each layer rolls back independently; the blog (aigraduate.com) and the apex DNS

@@ -44,8 +44,10 @@ never remove the ceilings.
 4. nginx: copy `nginx/rate-limits.conf` to `/etc/nginx/conf.d/` and
    `nginx/api.niminal.xyz.conf` to the sites dir. **Do not edit any blog block.**
    `nginx -t` before reload.
-5. TLS: issue a **separate** cert for `api.niminal.xyz` via certbot (webroot
-   `/var/www/certbot`); do not touch the blog's certs.
+5. TLS: this box uses **acme.sh** (not certbot). Issue a **separate** cert for
+   `api.niminal.xyz` via its own webroot `/var/www/certbot` and `--install-cert`
+   to `/etc/letsencrypt/api.niminal.xyz/` — see RUNBOOK.md §4 for exact commands.
+   Do not touch the blog's cert, webroot, or renewal.
 6. DNS: add an A record `api.niminal.xyz → <droplet IP>` (direct, no buffering CDN
    that would break SSE).
 7. Verify end-to-end from the Vercel frontend, then re-check blog health.

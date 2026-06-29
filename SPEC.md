@@ -187,7 +187,7 @@ Base URL: `https://api.hyperliquid.xyz`
 **Backend subdomain (droplet):**
 4. **DNS (BigRock):** add an A record `api.niminal.xyz → <DROPLET_IP>`. (Confirm whether to proxy; for SSE keep it a direct A record, no CDN that buffers streams.)
 5. **nginx:** add a *new* server block for `api.niminal.xyz` only — do **not** edit existing aigraduate blocks. `proxy_pass` to the Node process on `127.0.0.1:<port>`. Add SSE-friendly settings (`proxy_buffering off`, long read timeout) and the §8.5 hardening.
-6. **TLS:** issue a cert for `api.niminal.xyz` via certbot (separate cert/block; don't touch blog certs).
+6. **TLS:** issue a cert for `api.niminal.xyz` via the box's existing **acme.sh** (separate webroot `/var/www/certbot` + `--install-cert` to its own dir; don't touch blog cert/webroot/renewal). *(Box uses acme.sh, not certbot — confirmed Phase 9.)*
 7. **Service:** run Node under pm2/systemd as an unprivileged user, bound to 127.0.0.1.
 8. **Verify** the stream end-to-end from the Vercel frontend, then monitor blog health (it must be unaffected).
 
@@ -425,13 +425,14 @@ Base URL: `https://api.hyperliquid.xyz`
 - ⬜ BigRock DNS: A record api.niminal.xyz → <DROPLET_IP>
 - ⬜ NEW nginx server block for api.niminal.xyz only (don't touch blog blocks)
 - ⬜ SSE-friendly nginx (proxy_buffering off, long read timeout)
-- ⬜ certbot TLS for api.niminal.xyz (separate; don't touch blog certs)
+- ⬜ acme.sh TLS for api.niminal.xyz (separate webroot `/var/www/certbot` + `--install-cert`; don't touch blog cert/webroot/renewal)
 - ⬜ pm2/systemd service up
 - ⬜ End-to-end stream verified from Vercel frontend
 - ⬜ Blog health re-checked (aigraduate.com unaffected)
 - *Notes:*
   - *Dependencies: install project-local only — `npm ci` (uses the committed `package-lock.json`) inside `backend/` under the service user's own directory. Never `npm install -g` / system-wide (§8.5 isolation). `better-sqlite3@^11` is prebuilt, so **no compiler toolchain** (build-essential/python) needs to be installed on the droplet.*
-  - *2026-07-01 — **Runbook authored: `backend/deploy/RUNBOOK.md`** (not executed). Precise, ordered, copy-pasteable steps drawn from `backend/deploy/`; each step has command · what it does · success check · rollback. Order is blog-safe and additive: pre-flight backups → backend up **privately** (user/code/`npm ci`/systemd, localhost-verified) → nginx rate-limit drop-in + HTTP-only api block → DNS A record → certbot (separate cert) → enable 443 → **verify backend over TLS AND blog health (explicit STOP-if-blog-affected gate)** → confirm DO firewall 80/443/22 → Vercel repoint (env var set before build) → final E2E + per-layer rollback. **Operator executes each command by hand with review; assistant runs nothing against droplet/DNS/Vercel.** Resolves the cert chicken-and-egg (HTTP-only block → DNS → webroot certbot → enable 443) and the NEXT_PUBLIC build-time-inlining gotcha. Open questions captured at the top of the runbook (droplet IP, code transport, node path, nginx convention, certbot method/webroot, port 8765 free, Vercel git-connection, canonical origin/www, current firewall rules).*
+  - *2026-07-01 — **Runbook authored: `backend/deploy/RUNBOOK.md`** (not executed). Precise, ordered, copy-pasteable steps drawn from `backend/deploy/`; each step has command · what it does · success check · rollback. Order is blog-safe and additive: pre-flight backups → backend up **privately** (user/code/`npm ci`/systemd, localhost-verified) → nginx rate-limit drop-in + HTTP-only api block → DNS A record → TLS → enable 443 → **verify backend over TLS AND blog health (explicit STOP-if-blog-affected gate)** → confirm DO firewall 80/443/22 → Vercel repoint (env var set before build) → final E2E + per-layer rollback. **Operator executes each command by hand with review; assistant runs nothing against droplet/DNS/Vercel.** Resolves the cert chicken-and-egg (HTTP-only block → DNS → webroot challenge → enable 443) and the NEXT_PUBLIC build-time-inlining gotcha.*
+  - *2026-07-xx — **TLS revised to the box's actual tooling: acme.sh, not certbot.** Investigation found acme.sh (`/etc/letsencrypt/acme.sh`, home `/etc/letsencrypt`, daily cron `20 0 * * *`); blog cert via webroot HTTP-01 (`/var/www/ghost/system/nginx-root`). Revised `nginx/api.niminal.xyz.conf` cert paths to acme.sh's install location (`/etc/letsencrypt/api.niminal.xyz/{fullchain.cer,api.niminal.xyz.key}` — not certbot's `live/`), and RUNBOOK §4 to `acme.sh --issue --server letsencrypt -d api.niminal.xyz -w /var/www/certbot` (a **separate** webroot) + `--install-cert` with an nginx-reload `--reloadcmd` (so it joins the existing cron). Blog cert/webroot/renewal untouched. Other resolved box facts: nginx `sites-enabled/` + `conf.d/` both included; Node 20 at `/usr/bin/node`; `hldash` user + `/opt/hldash/backend` + `npm ci` present; port 8765 free.*
 
 ### Open questions
 - ✅ **RESOLVED — Poll-first upstream.** Shipped as REST poll (`metaAndAssetCtxs` ~2s); the WS-to-HL swap stays a future optimization, not needed at current scale.
